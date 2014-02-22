@@ -35,6 +35,8 @@ def dns():
     # defaultKnownNodes.py. Hopefully either they are up to date or the user
     # has run Bitmessage recently without SOCKS turned on and received good
     # bootstrap nodes using that method.
+    if shared.localNetworkTesting:
+        return
     with shared.printLock:
         if shared.config.get('bitmessagesettings', 'socksproxytype') == 'none':
             try:

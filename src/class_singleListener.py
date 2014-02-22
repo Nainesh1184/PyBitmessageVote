@@ -32,9 +32,6 @@ class singleListener(threading.Thread):
         while shared.config.get('bitmessagesettings', 'socksproxytype')[0:5] == 'SOCKS' and not shared.config.getboolean('bitmessagesettings', 'sockslisten'):
             time.sleep(5)
 
-        with shared.printLock:
-            print 'Listening for incoming connections.'
-
         HOST = ''  # Symbolic name meaning all available interfaces
         PORT = shared.config.getint('bitmessagesettings', 'port')
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -43,6 +40,9 @@ class singleListener(threading.Thread):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((HOST, PORT))
         sock.listen(2)
+        
+        with shared.printLock:
+            print 'Listening for incoming connections on %s:%d.' % ( HOST, PORT )
 
         while True:
             # We typically don't want to accept incoming connections if the user is using a
@@ -62,7 +62,9 @@ class singleListener(threading.Thread):
             # connection if someone else on the same LAN is already connected
             # because the two computers will share the same external IP. This
             # is here to prevent connection flooding.
-            while HOST in shared.connectedHostsList:
+            while ( not shared.localNetworkTesting and HOST in shared.connectedHostsList ) or \
+                ( shared.localNetworkTesting and (HOST,PORT) in shared.connectedPeersList ):
+                
                 with shared.printLock:
                     print 'We are already connected to', HOST + '. Ignoring connection.'
 

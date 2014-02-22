@@ -11,16 +11,24 @@ def createDefaultKnownNodes(appdata):
     ############## Stream 1 ################
     stream1 = {}
 
-    stream1[shared.Peer('176.31.246.114', 8444)] = int(time.time())
-    stream1[shared.Peer('109.229.197.133', 8444)] = int(time.time())
-    stream1[shared.Peer('174.3.101.111', 8444)] = int(time.time())
-    stream1[shared.Peer('90.188.238.79', 7829)] = int(time.time())
-    stream1[shared.Peer('184.75.69.2', 8444)] = int(time.time())
-    stream1[shared.Peer('60.225.209.243', 8444)] = int(time.time())
-    stream1[shared.Peer('5.145.140.218', 8444)] = int(time.time())
-    stream1[shared.Peer('5.19.255.216', 8444)] = int(time.time())
-    stream1[shared.Peer('193.159.162.189', 8444)] = int(time.time())
-    stream1[shared.Peer('86.26.15.171', 8444)] = int(time.time())
+    if shared.localNetworkTesting:
+        ip = '127.0.0.1'
+        stream1[shared.Peer(ip,8444)] = int(time.time())
+        #stream1[shared.Peer(ip,8445)] = int(time.time())
+        #stream1[shared.Peer(ip,8446)] = int(time.time())
+        #stream1[shared.Peer(ip,8447)] = int(time.time())
+        #stream1[shared.Peer(ip,8448)] = int(time.time())
+    else:
+        stream1[shared.Peer('176.31.246.114', 8444)] = int(time.time())
+        stream1[shared.Peer('109.229.197.133', 8444)] = int(time.time())
+        stream1[shared.Peer('174.3.101.111', 8444)] = int(time.time())
+        stream1[shared.Peer('90.188.238.79', 7829)] = int(time.time())
+        stream1[shared.Peer('184.75.69.2', 8444)] = int(time.time())
+        stream1[shared.Peer('60.225.209.243', 8444)] = int(time.time())
+        stream1[shared.Peer('5.145.140.218', 8444)] = int(time.time())
+        stream1[shared.Peer('5.19.255.216', 8444)] = int(time.time())
+        stream1[shared.Peer('193.159.162.189', 8444)] = int(time.time())
+        stream1[shared.Peer('86.26.15.171', 8444)] = int(time.time())
 
     ############# Stream 2 #################
     stream2 = {}

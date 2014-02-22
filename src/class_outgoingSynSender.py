@@ -34,8 +34,24 @@ class outgoingSynSender(threading.Thread):
             shared.knownNodesLock.acquire()
             peer, = random.sample(shared.knownNodes[self.streamNumber], 1)
             shared.knownNodesLock.release()
+            if shared.localNetworkTesting:
+                if not peer.host.startswith( '192.168' ) and not peer.host == '127.0.0.1':
+#                    with shared.printLock: 
+#                        print "Peer %s not in local network. Skipping" % ( peer.host )
+                    time.sleep( 0.5 )
+                    continue
+                elif peer.port == shared.config.getint('bitmessagesettings', 'port'):
+#                    with shared.printLock: 
+#                        print "Not connecting to myself..."
+                    continue
+#                else:
+#                    with shared.printLock: 
+#                        print "Peer (%s,%d) is in local network, trying to connect" % ( peer.host, peer.port )
             shared.alreadyAttemptedConnectionsListLock.acquire()
-            while peer in shared.alreadyAttemptedConnectionsList or peer.host in shared.connectedHostsList:
+            while peer in shared.alreadyAttemptedConnectionsList or \
+                ( not shared.localNetworkTesting and peer.host in shared.connectedHostsList ) or \
+                ( shared.localNetworkTesting and (peer.host,peer.port) in shared.connectedPeersList ):
+                
                 shared.alreadyAttemptedConnectionsListLock.release()
                 # print 'choosing new sample'
                 random.seed()
