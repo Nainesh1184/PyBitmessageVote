@@ -29,6 +29,8 @@ import shared
 import helper_startup
 from helper_sql import *
 
+allowMultipleInstances = True
+instanceNo = None
 
 config = ConfigParser.SafeConfigParser()
 myECCryptorObjects = {}
@@ -131,6 +133,8 @@ def assembleVersionMessage(remoteHost, remotePort, myStreamNumber):
 
 def lookupAppdataFolder():
     APPNAME = "PyBitmessage"
+    if instanceNo is not None:
+        APPNAME = path.join( APPNAME, "instance-%d" % instanceNo )
     if "BITMESSAGE_HOME" in environ:
         dataFolder = environ["BITMESSAGE_HOME"]
         if dataFolder[-1] not in [os.path.sep, os.path.altsep]:
@@ -148,6 +152,7 @@ def lookupAppdataFolder():
 
     elif 'win32' in sys.platform or 'win64' in sys.platform:
         dataFolder = path.join(environ['APPDATA'].decode(sys.getfilesystemencoding(), 'ignore'), APPNAME) + path.sep
+        print "dataFolder=%s" % dataFolder
     else:
         from shutil import move
         try:
@@ -758,6 +763,4 @@ def checkAndShareBroadcastWithPeers(data):
         shared.objectProcessorQueueSize += len(data)
         objectProcessorQueue.put((objectType,data))
 
-
-helper_startup.loadConfig()
 from debug import logger

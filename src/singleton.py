@@ -4,6 +4,7 @@ import sys
 import os
 import errno
 import tempfile
+import shared
 from multiprocessing import Process
 
 
@@ -18,30 +19,45 @@ class singleinstance:
         import sys
         self.initialized = False
         basename = os.path.splitext(os.path.abspath(sys.argv[0]))[0].replace("/", "-").replace(":", "").replace("\\", "-") + '-%s' % flavor_id + '.lock'
-        self.lockfile = os.path.normpath(tempfile.gettempdir() + '/' + basename)
+        if shared.allowMultipleInstances:
+            shared.instanceNo = 0
+            while True:
+                shared.instanceNo += 1
+                self.lockfile = os.path.normpath(tempfile.gettempdir() + '/' + basename + "-instance-%d" % shared.instanceNo )
+                if self.tryLockFile( self.lockfile ):
+                    break
+            
+        else:
+            self.lockfile = os.path.normpath(tempfile.gettempdir() + '/' + basename)
+            if not self.tryLockFile( self.lockfile ):
+                print 'Another instance of this application is already running'
+                sys.exit(-1)
 
+        print "Lockfile: %s" % ( self.lockfile )
+        self.initialized = True
+        
+    def tryLockFile(self, filename):
         if sys.platform == 'win32':
             try:
                 # file already exists, we try to remove (in case previous execution was interrupted)
-                if os.path.exists(self.lockfile):
-                    os.unlink(self.lockfile)
-                self.fd = os.open(self.lockfile, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                if os.path.exists(filename):
+                    os.unlink(filename)
+                self.fd = os.open(filename, os.O_CREAT | os.O_EXCL | os.O_RDWR)
             except OSError:
                 type, e, tb = sys.exc_info()
                 if e.errno == 13:
-                    print 'Another instance of this application is already running'
-                    sys.exit(-1)
+                    return False
                 print(e.errno)
                 raise
         else:  # non Windows
             import fcntl  # @UnresolvedImport
-            self.fp = open(self.lockfile, 'w')
+            self.fp = open(filename, 'w')
             try:
                 fcntl.lockf(self.fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except IOError:
-                print 'Another instance of this application is already running'
-                sys.exit(-1)
-        self.initialized = True
+                return False
+            
+        return True
 
     def __del__(self):
         import sys

@@ -39,6 +39,7 @@ from debug import logger
 # Helper Functions
 import helper_bootstrap
 import helper_generic
+import helper_startup
 
 from subprocess import call
 import time
@@ -98,6 +99,7 @@ class Main:
         shared.daemon = daemon
         # is the application already running?  If yes then exit.
         thisapp = singleton.singleinstance()
+        helper_startup.loadConfig()
 
         signal.signal(signal.SIGINT, helper_generic.signal_handler)
         # signal.signal(signal.SIGINT, signal.SIG_DFL)
