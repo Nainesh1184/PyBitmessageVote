@@ -62,8 +62,7 @@ class singleListener(threading.Thread):
             # connection if someone else on the same LAN is already connected
             # because the two computers will share the same external IP. This
             # is here to prevent connection flooding.
-            while ( not shared.localNetworkTesting and HOST in shared.connectedHostsList ) or \
-                ( shared.localNetworkTesting and (HOST,PORT) in shared.connectedPeersList ):
+            while ( (HOST,PORT) if shared.localNetworkTesting else HOST ) in shared.connectedHostsList:
                 
                 with shared.printLock:
                     print 'We are already connected to', HOST + '. Ignoring connection.'

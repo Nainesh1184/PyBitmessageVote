@@ -53,7 +53,6 @@ objectProcessorQueueSize = 0 # in Bytes. We maintain this to prevent nodes from 
 appdata = '' #holds the location of the application data storage directory
 statusIconColor = 'red'
 connectedHostsList = {} #List of hosts to which we are connected. Used to guarantee that the outgoingSynSender threads won't connect to the same remote node twice.
-connectedPeersList = {}
 shutdown = 0 #Set to 1 by the doCleanShutdown function. Used to tell the proof of work worker threads to exit.
 alreadyAttemptedConnectionsList = {
 }  # This is a list of nodes to which we have already attempted a connection

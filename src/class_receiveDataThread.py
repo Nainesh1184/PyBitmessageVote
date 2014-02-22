@@ -51,9 +51,8 @@ class receiveDataThread(threading.Thread):
         self.objectsThatWeHaveYetToGetFromThisPeer = {}
         self.selfInitiatedConnections = selfInitiatedConnections
         self.sendDataThreadQueue = sendDataThreadQueue # used to send commands and data to the sendDataThread
-        shared.connectedHostsList[self.peer.host] = 0  # The very fact that this receiveData thread exists shows that we are connected to the remote host. Let's add it to this list so that an outgoingSynSender thread doesn't try to connect to it.
-        shared.connectedPeersList[
-            (self.peer.host,self.peer.port)] = 0  # The very fact that this receiveData thread exists shows that we are connected to the remote host. Let's add it to this list so that an outgoingSynSender thread doesn't try to connect to it.
+        self.host = (self.peer.host,self.peer.port) if shared.localNetworkTesting else self.peer.host
+        shared.connectedHostsList[self.host] = 0  # The very fact that this receiveData thread exists shows that we are connected to the remote host. Let's add it to this list so that an outgoingSynSender thread doesn't try to connect to it.
         self.connectionIsOrWasFullyEstablished = False  # set to true after the remote node and I accept each other's version messages. This is needed to allow the user interface to accurately reflect the current number of connections.
         if self.streamNumber == -1:  # This was an incoming connection. Send out a version message if we accept the other node's version message.
             self.initiatedConnection = False
@@ -94,11 +93,10 @@ class receiveDataThread(threading.Thread):
             pass
         shared.broadcastToSendDataQueues((0, 'shutdown', self.peer)) # commands the corresponding sendDataThread to shut itself down.
         try:
-            del shared.connectedHostsList[self.peer.host]
-            del shared.connectedPeersList[(self.peer.host,self.peer.port)]
+            del shared.connectedHostsList[self.host]
         except Exception as err:
             with shared.printLock:
-                print 'Could not delete', (self.peer.host,self.peer.port), 'from shared.connectedHostsList.', err
+                print 'Could not delete', self.host, 'from shared.connectedHostsList.', err
 
         try:
             del shared.numberOfObjectsThatWeHaveYetToGetPerPeer[
@@ -762,9 +760,7 @@ class receiveDataThread(threading.Thread):
                 with shared.printLock:
                     print 'Closed connection to', self.peer, 'because they are interested in stream', self.streamNumber, '.'
                 return
-            shared.connectedHostsList[self.peer.host] = 1  # We use this data structure to not only keep track of what hosts we are connected to so that we don't try to connect to them again, but also to list the connections count on the Network Status tab.
-            shared.connectedPeersList[
-                (self.peer.host,self.peer.port)] = 1  # We use this data structure to not only keep track of what hosts we are connected to so that we don't try to connect to them again, but also to list the connections count on the Network Status tab.
+            shared.connectedHostsList[self.host] = 1  # We use this data structure to not only keep track of what hosts we are connected to so that we don't try to connect to them again, but also to list the connections count on the Network Status tab.
             # If this was an incoming connection, then the sendData thread
             # doesn't know the stream. We have to set it.
             if not self.initiatedConnection:

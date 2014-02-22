@@ -50,7 +50,7 @@ class outgoingSynSender(threading.Thread):
             shared.alreadyAttemptedConnectionsListLock.acquire()
             while peer in shared.alreadyAttemptedConnectionsList or \
                 ( not shared.localNetworkTesting and peer.host in shared.connectedHostsList ) or \
-                ( shared.localNetworkTesting and (peer.host,peer.port) in shared.connectedPeersList ):
+                ( shared.localNetworkTesting and (peer.host,peer.port) in shared.connectedHostsList ):
                 
                 shared.alreadyAttemptedConnectionsListLock.release()
                 # print 'choosing new sample'
