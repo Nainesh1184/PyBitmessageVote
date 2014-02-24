@@ -57,7 +57,7 @@
        <enum>QTabWidget::Rounded</enum>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>4</number>
       </property>
       <widget class="QWidget" name="inbox">
        <attribute name="icon">
@@ -1044,6 +1044,50 @@ p, li { white-space: pre-wrap; }
          <string>Inventory lookups per second: 0</string>
         </property>
        </widget>
+      </widget>
+      <widget class="QWidget" name="voting">
+       <attribute name="icon">
+        <iconset resource="bitmessage_icons.qrc">
+         <normaloff>:/newPrefix/images/blacklist.png</normaloff>:/newPrefix/images/blacklist.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Voting</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout_7">
+        <item row="2" column="0">
+         <spacer name="horizontalSpacer_3">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item row="2" column="1">
+         <widget class="QPushButton" name="pushButtonCreateElection">
+          <property name="text">
+           <string>Create election</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <spacer name="verticalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
       </widget>
      </widget>
     </item>

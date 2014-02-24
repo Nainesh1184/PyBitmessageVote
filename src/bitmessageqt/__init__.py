@@ -21,6 +21,7 @@ from newsubscriptiondialog import *
 from regenerateaddresses import *
 from newchandialog import *
 from specialaddressbehavior import *
+from createelectiondialog import *
 from settings import *
 from about import *
 from help import *
@@ -224,6 +225,9 @@ class MyForm(QtGui.QMainWindow):
             "triggered()"), self.click_actionAbout)
         QtCore.QObject.connect(self.ui.actionHelp, QtCore.SIGNAL(
             "triggered()"), self.click_actionHelp)
+        
+        QtCore.QObject.connect(self.ui.pushButtonCreateElection, QtCore.SIGNAL(
+            "clicked()"), self.click_pushButtonCreateElection)
 
     def init_inbox_popup_menu(self):
         # Popup menu for the Inbox tab
@@ -2533,6 +2537,13 @@ class MyForm(QtGui.QMainWindow):
                     ), self.dialog.ui.lineEditPassphrase.text().toUtf8(), self.dialog.ui.checkBoxEighteenByteRipe.isChecked()))
         else:
             print 'new address dialog box rejected'
+            
+    def click_pushButtonCreateElection(self):
+        self.dialog = NewCreateElectionDialog(self)
+        if self.dialog.exec_():
+            election = self.dialog.result
+            QMessageBox.about(self, "Created an election", str( election ) )
+            pass
 
     # Quit selected from menu or application indicator
     def quit(self):
@@ -3653,6 +3664,70 @@ class NewAddressDialog(QtGui.QDialog):
             row += 1
         self.ui.groupBoxDeterministic.setHidden(True)
         QtGui.QWidget.resize(self, QtGui.QWidget.sizeHint(self))
+        
+class NewCreateElectionDialog(QtGui.QDialog):
+    def __init__(self, parent):
+        QtGui.QWidget.__init__(self, parent)
+        self.ui = Ui_CreateElectionDialog()
+        self.ui.setupUi(self)
+        self.parent = parent
+        self.question = ""
+        self.answers = []
+        self.voters = []
+        self.result = None
+        self.ui.lineEditQuestion.textChanged.connect( self.question_changed )
+        self.ui.pushButtonAddAnswer.clicked.connect( self.add_answer )
+        self.ui.pushButtonAddVoter.clicked.connect( self.add_voter )
+        
+        self.question = "The question"
+        self.ui.lineEditQuestion.setText(self.question)
+        self.answers = ['Answer 1','Answer 2']
+        self.refresh_answers()
+        self.voters = ['BM-2cTdsHgnbJgNT3N2ZKDqHq6UWFrYbEqb11', 'BM-2cWxDjH93Acjz5roZV13Cqq1nVfugc1fi2','BM-2cU54f337MYToBBXL2Kp7hQA4X6kpxmvE8']
+        self.refresh_voters()
+
+        
+    def accept(self):
+        if len( self.question ) < 1:
+            QMessageBox.about(self, _translate("MainWindow", "No question"), _translate(
+                        "MainWindow", "You need to enter a question."))
+        elif len( self.answers ) <= 1:
+            QMessageBox.about(self, _translate("MainWindow", "Not enough answers"), _translate(
+                        "MainWindow", "You need to enter at least two answers."))
+        elif len( self.voters ) <= 2:
+            QMessageBox.about(self, _translate("MainWindow", "Not enough voters"), _translate(
+                        "MainWindow", "You need to enter at least three voter addresses."))
+        else:
+            from voting import Election
+            self.result = Election( self.question, self.answers, self.voters )
+            QtGui.QDialog.accept(self)
+        
+    def refresh_answers(self):
+        self.ui.listWidgetAnswers.clear()
+        for i in range( len( self.answers ) ):
+            self.ui.listWidgetAnswers.addItem( "%d. %s" % ( i+1, self.answers[i] ) )
+            
+    def refresh_voters(self):
+        self.ui.listWidgetVoters.clear()
+        for voter in self.voters:
+            self.ui.listWidgetVoters.addItem( voter )
+            
+    def question_changed(self):
+        self.question = self.ui.lineEditQuestion.text()        
+    
+    def add_answer(self):
+        text, ok = QtGui.QInputDialog.getText(self, 'Add answer', 'Enter answer:')
+        if ok and text.trimmed() != "":
+            self.answers.append( text.trimmed() )
+            self.refresh_answers()
+            
+    def add_voter(self):
+        text, ok = QtGui.QInputDialog.getText(self, 'Add voter', 'Enter a Bitmessage address:')
+        if ok and not text in self.voters:
+            status, addressVersionNumber, streamNumber, ripe = decodeAddress( text )
+            if status == "success":
+                self.voters.append( text )
+                self.refresh_voters()
 
 class newChanDialog(QtGui.QDialog):
 

@@ -2,8 +2,8 @@
 
 # Form implementation generated from reading ui file 'bitmessageui.ui'
 #
-# Created: Sat Nov  2 18:01:09 2013
-#      by: PyQt4 UI code generator 4.10
+# Created: Mon Feb 24 12:59:33 2014
+#      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -436,6 +436,18 @@ class Ui_MainWindow(object):
         icon9 = QtGui.QIcon()
         icon9.addPixmap(QtGui.QPixmap(_fromUtf8(":/newPrefix/images/networkstatus.png")), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.tabWidget.addTab(self.networkstatus, icon9, _fromUtf8(""))
+        self.voting = QtGui.QWidget()
+        self.voting.setObjectName(_fromUtf8("voting"))
+        self.gridLayout_7 = QtGui.QGridLayout(self.voting)
+        self.gridLayout_7.setObjectName(_fromUtf8("gridLayout_7"))
+        spacerItem6 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
+        self.gridLayout_7.addItem(spacerItem6, 2, 0, 1, 1)
+        self.pushButtonCreateElection = QtGui.QPushButton(self.voting)
+        self.pushButtonCreateElection.setObjectName(_fromUtf8("pushButtonCreateElection"))
+        self.gridLayout_7.addWidget(self.pushButtonCreateElection, 2, 1, 1, 1)
+        spacerItem7 = QtGui.QSpacerItem(20, 40, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        self.gridLayout_7.addItem(spacerItem7, 3, 1, 1, 1)
+        self.tabWidget.addTab(self.voting, icon7, _fromUtf8(""))
         self.gridLayout.addWidget(self.tabWidget, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow)
@@ -626,6 +638,8 @@ class Ui_MainWindow(object):
         self.labelBroadcastCount.setText(_translate("MainWindow", "Processed 0 broadcast.", None))
         self.labelLookupsPerSecond.setText(_translate("MainWindow", "Inventory lookups per second: 0", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.networkstatus), _translate("MainWindow", "Network Status", None))
+        self.pushButtonCreateElection.setText(_translate("MainWindow", "Create election", None))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.voting), _translate("MainWindow", "Voting", None))
         self.menuFile.setTitle(_translate("MainWindow", "File", None))
         self.menuSettings.setTitle(_translate("MainWindow", "Settings", None))
         self.menuHelp.setTitle(_translate("MainWindow", "Help", None))

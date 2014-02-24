@@ -30,6 +30,7 @@ import helper_startup
 from helper_sql import *
 
 localNetworkTesting = True
+useVeryEasyProofOfWorkForTesting = useVeryEasyProofOfWorkForTesting or localNetworkTesting
 allowMultipleInstances = True
 instanceNo = None
 
