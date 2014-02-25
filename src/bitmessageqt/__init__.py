@@ -446,6 +446,25 @@ class MyForm(QtGui.QMainWindow):
         self.popMenuBlacklist.addAction(self.actionBlacklistEnable)
         self.popMenuBlacklist.addAction(self.actionBlacklistDisable)
         self.popMenuBlacklist.addAction(self.actionBlacklistSetAvatar)
+        
+    def init_elections_popup_menu(self):
+        self.ui.electionsContextMenuToolbar = QtGui.QToolBar()
+        
+        self.actionElectionsExport = self.ui.electionsContextMenuToolbar.addAction(
+            _translate( "MainWindow", "Export" ), self.on_action_electionExport)
+        self.actionElectionsDelete = self.ui.electionsContextMenuToolbar.addAction(
+            _translate( "MainWindow", "Delete" ), self.on_action_electionDelete)
+            
+        self.ui.tableWidgetElections.setContextMenuPolicy(
+            QtCore.Qt.CustomContextMenu)
+        self.connect(self.ui.tableWidgetElections, QtCore.SIGNAL(
+            'customContextMenuRequested(const QPoint&)'),
+                     self.on_context_menuElections)
+        self.popMenuElections = QtGui.QMenu(self)
+
+        self.popMenuElections.addAction(self.actionElectionsExport)
+        self.popMenuElections.addSeparator()
+        self.popMenuElections.addAction(self.actionElectionsDelete)
 
     def __init__(self, parent=None):
         QtGui.QWidget.__init__(self, parent)
@@ -500,11 +519,15 @@ class MyForm(QtGui.QMainWindow):
         self.init_subscriptions_popup_menu()
         self.init_sent_popup_menu()
         self.init_blacklist_popup_menu()
+        self.init_elections_popup_menu()
 
         # Initialize the user's list of addresses on the 'Your Identities' tab.
         configSections = shared.config.sections()
         for addressInKeysFile in configSections:
             if addressInKeysFile != 'bitmessagesettings':
+                # Don't show elections in identities
+                if shared.safeConfigGetBoolean( addressInKeysFile, 'vote'):
+                    continue
                 isEnabled = shared.config.getboolean(
                     addressInKeysFile, 'enabled')
                 newItem = QtGui.QTableWidgetItem(unicode(
@@ -1833,6 +1856,7 @@ class MyForm(QtGui.QMainWindow):
                 self.ui.tableWidgetElections.insertRow(0)
                 
                 newItem = QtGui.QTableWidgetItem( election.question )
+                newItem.setData( Qt.UserRole, election )
                 newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
                 newItem.setIcon(avatarize(chanAddress))
                 if not isEnabled:
@@ -3144,6 +3168,25 @@ class MyForm(QtGui.QMainWindow):
             self.rerenderInboxToLabels()
             self.rerenderSentFromLabels()
             self.rerenderSentToLabels()
+
+    def get_selected_election(self):
+        currentRow = self.ui.tableWidgetElections.currentRow()
+        return self.ui.tableWidgetElections.item( currentRow, 0 ).data( Qt.UserRole ).toPyObject()
+            
+    def on_action_electionExport(self):
+        election = self.get_selected_election()
+        QMessageBox.about(self, _translate("MainWindow", "Export election"),
+            _translate("MainWindow", "Export election %s" % election.question))
+#        self.ui.tableWidgetBlacklist.removeRow(currentRow)
+
+    def on_action_electionDelete(self):
+        currentRow = self.ui.tableWidgetElections.currentRow()
+        election = self.get_selected_election()
+        QMessageBox.about(self, _translate("MainWindow", "Delete election"),
+            _translate("MainWindow", "Delete election %s" % election.question))
+        election.delete()
+        self.ui.tableWidgetElections.removeRow(currentRow)
+
         
     def on_context_menuYourIdentities(self, point):
         self.popMenu.exec_(
@@ -3168,6 +3211,10 @@ class MyForm(QtGui.QMainWindow):
         if status == 'toodifficult':
             self.popMenuSent.addAction(self.actionForceSend)
         self.popMenuSent.exec_(self.ui.tableWidgetSent.mapToGlobal(point))
+        
+    def on_context_menuElections(self, point):
+        self.popMenuElections.exec_(
+            self.ui.tableWidgetElections.mapToGlobal(point))
 
     def inboxSearchLineEditPressed(self):
         searchKeyword = self.ui.inboxSearchLineEdit.text().toUtf8().data()

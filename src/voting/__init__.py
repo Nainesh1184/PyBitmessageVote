@@ -77,8 +77,8 @@ class Election:
         shared.config.set( self.chanAddress, "question", self.question )
         shared.config.set( self.chanAddress, "answers", json.dumps( self.answers ) )
         shared.config.set( self.chanAddress, "voters", json.dumps( self.voters ) )
-        with open(shared.appdata + 'keys.dat', 'wb') as configfile:
-            shared.config.write(configfile)
+        
+        self.flush_shared_config()
         
     def createChanLabel(self):
         return str( "%s %s" % ( self.chanLabelPrefix, self.question ) )
@@ -94,6 +94,17 @@ class Election:
         
         with open( filename, 'wb' ) as f:
             cp.write( f )
+            
+    def delete(self):
+        if not self.isAlreadyJoined():
+            return
+        
+        shared.config.remove_section( self.chanAddress )
+        self.flush_shared_config()
+        
+    def flush_shared_config(self):
+        with open(shared.appdata + 'keys.dat', 'wb') as configfile:
+            shared.config.write(configfile)
     
     @staticmethod   
     def readFromFile(filename):
