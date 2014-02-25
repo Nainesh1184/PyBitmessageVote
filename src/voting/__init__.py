@@ -3,8 +3,11 @@ from struct import unpack, pack
 from ConfigParser import ConfigParser
 import os
 import json
+import time
+from pyelliptic.openssl import OpenSSL
 
 from addresses import decodeAddress
+from helper_sql import sqlExecute
 import shared
 
 class Election:
@@ -78,6 +81,16 @@ class Election:
         shared.config.set( self.chanAddress, "voters", json.dumps( self.voters ) )
         
         self.flush_shared_config()
+        
+    def sendVote(self, fromAddress, answerNo):
+        if answerNo < 0 or answerNo >= len( self.answers ):
+            raise Exception( 'Invalid answer number: %d' % answerNo )
+        ackdata = OpenSSL.rand(32)
+        _, _, _, ripe = decodeAddress( self.chanAddress )
+        subject = self.question
+        t = ('', self.chanAddress, ripe, fromAddress, subject, answerNo,
+             ackdata, int(time.time()), 'msgqueued', 1, 1, 'sent', 2)
+        sqlExecute( 'INSERT INTO sent VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', *t )
         
     def createChanLabel(self):
         return str( "%s %s" % ( self.chanLabelPrefix, self.question ) )

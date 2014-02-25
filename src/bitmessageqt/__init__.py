@@ -232,6 +232,8 @@ class MyForm(QtGui.QMainWindow):
             "clicked()"), self.click_pushButtonCreateElection)
         QtCore.QObject.connect(self.ui.pushButtonImportElection, QtCore.SIGNAL(
             "clicked()"), self.click_pushButtonImportElection)
+        QtCore.QObject.connect(self.ui.pushButtonElectionVote, QtCore.SIGNAL(
+            "clicked()"), self.click_pushButtonElectionVote)
         
 
     def init_inbox_popup_menu(self):
@@ -601,6 +603,9 @@ class MyForm(QtGui.QMainWindow):
             "itemSelectionChanged ()"), self.tableWidgetInboxItemClicked)
         QtCore.QObject.connect(self.ui.tableWidgetSent, QtCore.SIGNAL(
             "itemSelectionChanged ()"), self.tableWidgetSentItemClicked)
+
+        QtCore.QObject.connect(self.ui.tableWidgetElections, QtCore.SIGNAL(
+            "itemSelectionChanged ()"), self.tableWidgetElectionItemClicked)
 
         # Put the colored icon on the status bar
         # self.ui.pushButtonStatusIcon.setIcon(QIcon(":/newPrefix/images/yellowicon.png"))
@@ -2607,6 +2612,7 @@ class MyForm(QtGui.QMainWindow):
         self.dialog = NewCreateElectionDialog(self)
         if self.dialog.exec_():
             election = self.dialog.result
+            election.joinChan()
             self.rerenderElections()
 
     def click_pushButtonImportElection(self):
@@ -2618,6 +2624,18 @@ class MyForm(QtGui.QMainWindow):
         election = Election.readFromFile( filename )
         election.joinChan()
         self.rerenderElections()
+
+    def click_pushButtonElectionVote(self):
+        fromAddress = str( self.ui.comboboxElectionAddress.currentText() )
+        answerNo = self.ui.comboboxElectionAnswer.currentIndex()
+        if fromAddress == '' or answerNo < 0:
+            return 
+        
+        election = self.get_selected_election()
+        election.sendVote( fromAddress, answerNo )
+        self.ui.tabWidget.setCurrentIndex( 2 )
+        self.loadSent()
+
 
     # Quit selected from menu or application indicator
     def quit(self):
@@ -3183,8 +3201,35 @@ class MyForm(QtGui.QMainWindow):
 
     def get_selected_election(self):
         currentRow = self.ui.tableWidgetElections.currentRow()
-        return self.ui.tableWidgetElections.item( currentRow, 0 ).data( Qt.UserRole ).toPyObject()
+        if currentRow >= 0:
+            return self.ui.tableWidgetElections.item( currentRow, 0 ).data( Qt.UserRole ).toPyObject()
+        else:
+            return None
             
+    def tableWidgetElectionItemClicked(self):
+        election = self.get_selected_election()
+        self.ui.listWidgetElectionAnswers.clear()
+        self.ui.listWidgetElectionVoters.clear()
+        self.ui.comboboxElectionAddress.clear()
+        self.ui.comboboxElectionAnswer.clear()
+        if election is not None:
+            for answer in election.answers:
+                newItem = QListWidgetItem( answer )
+                self.ui.listWidgetElectionAnswers.addItem( newItem )
+                self.ui.comboboxElectionAnswer.addItem( answer, answer )
+
+            myAddressVoterFont = QFont()
+            myAddressVoterFont.setBold( True )
+                
+            for voter in election.voters:
+                newItem = QListWidgetItem( voter )
+                newItem.setIcon( avatarize( voter ) )
+                if shared.config.has_section( voter ):
+                    newItem.setText( "%s (%s)" % ( shared.config.get( voter, 'label' ), voter ) )
+                    newItem.setFont( myAddressVoterFont )
+                    self.ui.comboboxElectionAddress.addItem( voter, voter )
+                self.ui.listWidgetElectionVoters.addItem( newItem )
+
     def on_action_electionExport(self):
         election = self.get_selected_election()
         filename = QtGui.QFileDialog.getSaveFileName(self, _translate("MainWindow", "Export election"),
