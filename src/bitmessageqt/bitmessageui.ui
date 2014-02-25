@@ -1054,6 +1054,13 @@ p, li { white-space: pre-wrap; }
         <string>Voting</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_7">
+        <item row="2" column="1">
+         <widget class="QPushButton" name="pushButtonCreateElection">
+          <property name="text">
+           <string>Create election</string>
+          </property>
+         </widget>
+        </item>
         <item row="2" column="0">
          <spacer name="horizontalSpacer_3">
           <property name="orientation">
@@ -1067,25 +1074,60 @@ p, li { white-space: pre-wrap; }
           </property>
          </spacer>
         </item>
-        <item row="2" column="1">
-         <widget class="QPushButton" name="pushButtonCreateElection">
-          <property name="text">
-           <string>Create election</string>
+        <item row="3" column="0" rowspan="2" colspan="2">
+         <widget class="QTableWidget" name="tableWidgetElections">
+          <property name="alternatingRowColors">
+           <bool>true</bool>
           </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SingleSelection</enum>
+          </property>
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+          <attribute name="horizontalHeaderCascadingSectionResizes">
+           <bool>true</bool>
+          </attribute>
+          <attribute name="horizontalHeaderDefaultSectionSize">
+           <number>346</number>
+          </attribute>
+          <attribute name="horizontalHeaderHighlightSections">
+           <bool>true</bool>
+          </attribute>
+          <attribute name="horizontalHeaderMinimumSectionSize">
+           <number>52</number>
+          </attribute>
+          <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+           <bool>true</bool>
+          </attribute>
+          <attribute name="horizontalHeaderStretchLastSection">
+           <bool>true</bool>
+          </attribute>
+          <attribute name="verticalHeaderVisible">
+           <bool>false</bool>
+          </attribute>
+          <attribute name="verticalHeaderDefaultSectionSize">
+           <number>26</number>
+          </attribute>
+          <column>
+           <property name="text">
+            <string>Question</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Registered voters</string>
+           </property>
+           <property name="textAlignment">
+            <set>AlignRight|AlignVCenter</set>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Chan Address</string>
+           </property>
+          </column>
          </widget>
-        </item>
-        <item row="3" column="1">
-         <spacer name="verticalSpacer_2">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>40</height>
-           </size>
-          </property>
-         </spacer>
         </item>
        </layout>
       </widget>
@@ -1099,7 +1141,7 @@ p, li { white-space: pre-wrap; }
      <x>0</x>
      <y>0</y>
      <width>885</width>
-     <height>27</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

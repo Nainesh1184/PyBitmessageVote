@@ -11,16 +11,17 @@ class Election:
     chanLabelPrefix = '[vote]'
     voteFileSection = 'VOTE'
     
-    def __init__(self, question, answers, voters, hash=None, chanAddress=None):
+    def __init__(self, question, answers, voters, hash=None, chanAddress=None, dontCheck=False):
         self.question = question
         self.answers = answers
         self.voters = voters
         self.hash = hash
         self.chanAddress = chanAddress
         self.checkValues()
-        self.computeAndCheckHash()
-        self.computeAndCheckChanAddress()
-        self.joinChan()
+        if not dontCheck:
+            self.computeAndCheckHash()
+            self.computeAndCheckChanAddress()
+            self.joinChan()
         
     def checkValues(self):
         if len( self.question ) == 0:
@@ -39,10 +40,8 @@ class Election:
     def computeAndCheckHash(self):
         sha = hashlib.new( 'sha256' )
         hashedString = self.question + ";" + ",".join( self.answers ) + ";" + ",".join( self.voters )
-        print repr( hashedString )
         sha.update( hashedString )
         calculatedHash = sha.hexdigest()
-        print repr( calculatedHash )
         if self.hash != None and self.hash != calculatedHash:
             raise Exception( 'Hash mismatch' )
         
@@ -95,8 +94,6 @@ class Election:
         
         with open( filename, 'wb' ) as f:
             cp.write( f )
-            
-        print "Read: %s" % Election.readFromFile( filename )
     
     @staticmethod   
     def readFromFile(filename):
@@ -107,6 +104,21 @@ class Election:
                          json.loads( cp.get( Election.voteFileSection, "voters" ) ),
                          cp.get( Election.voteFileSection, "hash" ),
                          cp.get( Election.voteFileSection, "chanAddress" ) )
+        
+    @staticmethod
+    def readFromAddress(address):
+        if not shared.config.has_section( address ):
+            return None
+        if not shared.config.getboolean( address, 'vote' ):
+            return None
+        
+        return Election( shared.config.get( address, 'question' ),
+                         json.loads( shared.config.get( address, 'answers' ) ),
+                         json.loads( shared.config.get( address, 'voters' ) ),
+                         chanAddress=address,
+                         dontCheck=True )
+        
+        
         
     def __str__(self):
         return "Election<%s (%d,%d,%s,%s)>" % ( self.question, len( self.answers ), len( self.voters ), self.chanAddress, self.hash )

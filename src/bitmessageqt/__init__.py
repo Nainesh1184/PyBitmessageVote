@@ -41,6 +41,8 @@ import subprocess
 import datetime
 from helper_sql import *
 
+from voting import Election
+
 try:
     from PyQt4 import QtCore, QtGui
     from PyQt4.QtCore import *
@@ -544,6 +546,8 @@ class MyForm(QtGui.QMainWindow):
 
         # Initialize the Subscriptions
         self.rerenderSubscriptions()
+        
+        self.rerenderElections()
 
         # Initialize the inbox search
         QtCore.QObject.connect(self.ui.inboxSearchLineEdit, QtCore.SIGNAL(
@@ -1813,6 +1817,40 @@ class MyForm(QtGui.QMainWindow):
             if not enabled:
                 newItem.setTextColor(QtGui.QColor(128, 128, 128))
             self.ui.tableWidgetSubscriptions.setItem(0, 1, newItem)
+            
+    def rerenderElections(self):
+        self.ui.tableWidgetElections.setRowCount(0)
+        configSections = shared.config.sections()
+        for chanAddress in configSections:
+            if chanAddress != 'bitmessagesettings':
+                isVote = shared.safeConfigGetBoolean( chanAddress, 'vote' )
+                isChan = shared.safeConfigGetBoolean( chanAddress, 'chan' )
+                if not isVote or not isChan:
+                    continue
+                election = Election.readFromAddress( chanAddress )
+                isEnabled = shared.safeConfigGetBoolean( chanAddress, 'enabled' )
+                
+                self.ui.tableWidgetElections.insertRow(0)
+                
+                newItem = QtGui.QTableWidgetItem( election.question )
+                newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+                newItem.setIcon(avatarize(chanAddress))
+                if not isEnabled:
+                    newItem.setTextColor(QtGui.QColor(128, 128, 128))
+                self.ui.tableWidgetElections.setItem(0, 0, newItem)
+                
+                newItem = QtGui.QTableWidgetItem( str( len( election.voters ) ) )
+                newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+                newItem.setTextAlignment( Qt.AlignRight | Qt.AlignVCenter )
+                if not isEnabled:
+                    newItem.setTextColor(QtGui.QColor(128, 128, 128))
+                self.ui.tableWidgetElections.setItem(0, 1, newItem)
+                
+                newItem = QtGui.QTableWidgetItem( chanAddress )
+                newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+                if not isEnabled:
+                    newItem.setTextColor(QtGui.QColor(128, 128, 128))
+                self.ui.tableWidgetElections.setItem(0, 2, newItem)
 
     def click_pushButtonSend(self):
         self.statusBar().showMessage('')
@@ -2542,7 +2580,7 @@ class MyForm(QtGui.QMainWindow):
         self.dialog = NewCreateElectionDialog(self)
         if self.dialog.exec_():
             election = self.dialog.result
-            QMessageBox.about(self, "Created an election", str( election ) )
+            self.rerenderElections()
             pass
 
     # Quit selected from menu or application indicator
@@ -3698,7 +3736,6 @@ class NewCreateElectionDialog(QtGui.QDialog):
             QMessageBox.about(self, _translate("MainWindow", "Not enough voters"), _translate(
                         "MainWindow", "You need to enter at least three voter addresses."))
         else:
-            from voting import Election
             # First convert from QStrings to normal Python strings
             question = str( self.question )
             answers = map( lambda s: str( s ), self.answers )

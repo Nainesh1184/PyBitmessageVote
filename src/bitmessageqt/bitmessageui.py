@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bitmessageui.ui'
 #
-# Created: Mon Feb 24 12:59:33 2014
+# Created: Tue Feb 25 12:34:39 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -440,18 +440,39 @@ class Ui_MainWindow(object):
         self.voting.setObjectName(_fromUtf8("voting"))
         self.gridLayout_7 = QtGui.QGridLayout(self.voting)
         self.gridLayout_7.setObjectName(_fromUtf8("gridLayout_7"))
-        spacerItem6 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.gridLayout_7.addItem(spacerItem6, 2, 0, 1, 1)
         self.pushButtonCreateElection = QtGui.QPushButton(self.voting)
         self.pushButtonCreateElection.setObjectName(_fromUtf8("pushButtonCreateElection"))
         self.gridLayout_7.addWidget(self.pushButtonCreateElection, 2, 1, 1, 1)
-        spacerItem7 = QtGui.QSpacerItem(20, 40, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
-        self.gridLayout_7.addItem(spacerItem7, 3, 1, 1, 1)
+        spacerItem6 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
+        self.gridLayout_7.addItem(spacerItem6, 2, 0, 1, 1)
+        self.tableWidgetElections = QtGui.QTableWidget(self.voting)
+        self.tableWidgetElections.setAlternatingRowColors(True)
+        self.tableWidgetElections.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.tableWidgetElections.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self.tableWidgetElections.setObjectName(_fromUtf8("tableWidgetElections"))
+        self.tableWidgetElections.setColumnCount(3)
+        self.tableWidgetElections.setRowCount(0)
+        item = QtGui.QTableWidgetItem()
+        self.tableWidgetElections.setHorizontalHeaderItem(0, item)
+        item = QtGui.QTableWidgetItem()
+        item.setTextAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter)
+        self.tableWidgetElections.setHorizontalHeaderItem(1, item)
+        item = QtGui.QTableWidgetItem()
+        self.tableWidgetElections.setHorizontalHeaderItem(2, item)
+        self.tableWidgetElections.horizontalHeader().setCascadingSectionResizes(True)
+        self.tableWidgetElections.horizontalHeader().setDefaultSectionSize(346)
+        self.tableWidgetElections.horizontalHeader().setHighlightSections(True)
+        self.tableWidgetElections.horizontalHeader().setMinimumSectionSize(52)
+        self.tableWidgetElections.horizontalHeader().setSortIndicatorShown(True)
+        self.tableWidgetElections.horizontalHeader().setStretchLastSection(True)
+        self.tableWidgetElections.verticalHeader().setVisible(False)
+        self.tableWidgetElections.verticalHeader().setDefaultSectionSize(26)
+        self.gridLayout_7.addWidget(self.tableWidgetElections, 3, 0, 2, 2)
         self.tabWidget.addTab(self.voting, icon7, _fromUtf8(""))
         self.gridLayout.addWidget(self.tabWidget, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 885, 27))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 885, 21))
         self.menubar.setObjectName(_fromUtf8("menubar"))
         self.menuFile = QtGui.QMenu(self.menubar)
         self.menuFile.setObjectName(_fromUtf8("menuFile"))
@@ -513,7 +534,7 @@ class Ui_MainWindow(object):
         self.menubar.addAction(self.menuHelp.menuAction())
 
         self.retranslateUi(MainWindow)
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(8)
         QtCore.QObject.connect(self.radioButtonSpecific, QtCore.SIGNAL(_fromUtf8("toggled(bool)")), self.lineEditTo.setEnabled)
         QtCore.QObject.connect(self.radioButtonSpecific, QtCore.SIGNAL(_fromUtf8("clicked(bool)")), self.labelSendBroadcastWarning.hide)
         QtCore.QObject.connect(self.radioButtonBroadcast, QtCore.SIGNAL(_fromUtf8("clicked()")), self.labelSendBroadcastWarning.show)
@@ -569,8 +590,8 @@ class Ui_MainWindow(object):
         self.textEditMessage.setHtml(_translate("MainWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'Sans\'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:\'MS Shell Dlg 2\';\"><br /></p></body></html>", None))
+"</style></head><body style=\" font-family:\'MS Shell Dlg 2\'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>", None))
         self.label.setText(_translate("MainWindow", "To:", None))
         self.label_2.setText(_translate("MainWindow", "From:", None))
         self.radioButtonBroadcast.setText(_translate("MainWindow", "Broadcast to everyone who is subscribed to your address", None))
@@ -639,6 +660,12 @@ class Ui_MainWindow(object):
         self.labelLookupsPerSecond.setText(_translate("MainWindow", "Inventory lookups per second: 0", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.networkstatus), _translate("MainWindow", "Network Status", None))
         self.pushButtonCreateElection.setText(_translate("MainWindow", "Create election", None))
+        item = self.tableWidgetElections.horizontalHeaderItem(0)
+        item.setText(_translate("MainWindow", "Question", None))
+        item = self.tableWidgetElections.horizontalHeaderItem(1)
+        item.setText(_translate("MainWindow", "Registered voters", None))
+        item = self.tableWidgetElections.horizontalHeaderItem(2)
+        item.setText(_translate("MainWindow", "Chan Address", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.voting), _translate("MainWindow", "Voting", None))
         self.menuFile.setTitle(_translate("MainWindow", "File", None))
         self.menuSettings.setTitle(_translate("MainWindow", "Settings", None))
