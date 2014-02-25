@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bitmessageui.ui'
 #
-# Created: Tue Feb 25 12:34:39 2014
+# Created: Tue Feb 25 13:18:17 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -442,7 +442,7 @@ class Ui_MainWindow(object):
         self.gridLayout_7.setObjectName(_fromUtf8("gridLayout_7"))
         self.pushButtonCreateElection = QtGui.QPushButton(self.voting)
         self.pushButtonCreateElection.setObjectName(_fromUtf8("pushButtonCreateElection"))
-        self.gridLayout_7.addWidget(self.pushButtonCreateElection, 2, 1, 1, 1)
+        self.gridLayout_7.addWidget(self.pushButtonCreateElection, 2, 2, 1, 1)
         spacerItem6 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
         self.gridLayout_7.addItem(spacerItem6, 2, 0, 1, 1)
         self.tableWidgetElections = QtGui.QTableWidget(self.voting)
@@ -467,7 +467,10 @@ class Ui_MainWindow(object):
         self.tableWidgetElections.horizontalHeader().setStretchLastSection(True)
         self.tableWidgetElections.verticalHeader().setVisible(False)
         self.tableWidgetElections.verticalHeader().setDefaultSectionSize(26)
-        self.gridLayout_7.addWidget(self.tableWidgetElections, 3, 0, 2, 2)
+        self.gridLayout_7.addWidget(self.tableWidgetElections, 3, 0, 2, 3)
+        self.pushButtonImportElection = QtGui.QPushButton(self.voting)
+        self.pushButtonImportElection.setObjectName(_fromUtf8("pushButtonImportElection"))
+        self.gridLayout_7.addWidget(self.pushButtonImportElection, 2, 1, 1, 1)
         self.tabWidget.addTab(self.voting, icon7, _fromUtf8(""))
         self.gridLayout.addWidget(self.tabWidget, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.centralwidget)
@@ -659,13 +662,14 @@ class Ui_MainWindow(object):
         self.labelBroadcastCount.setText(_translate("MainWindow", "Processed 0 broadcast.", None))
         self.labelLookupsPerSecond.setText(_translate("MainWindow", "Inventory lookups per second: 0", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.networkstatus), _translate("MainWindow", "Network Status", None))
-        self.pushButtonCreateElection.setText(_translate("MainWindow", "Create election", None))
+        self.pushButtonCreateElection.setText(_translate("MainWindow", "Create new election", None))
         item = self.tableWidgetElections.horizontalHeaderItem(0)
         item.setText(_translate("MainWindow", "Question", None))
         item = self.tableWidgetElections.horizontalHeaderItem(1)
         item.setText(_translate("MainWindow", "Registered voters", None))
         item = self.tableWidgetElections.horizontalHeaderItem(2)
         item.setText(_translate("MainWindow", "Chan Address", None))
+        self.pushButtonImportElection.setText(_translate("MainWindow", "Import election file", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.voting), _translate("MainWindow", "Voting", None))
         self.menuFile.setTitle(_translate("MainWindow", "File", None))
         self.menuSettings.setTitle(_translate("MainWindow", "Settings", None))

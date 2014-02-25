@@ -230,6 +230,9 @@ class MyForm(QtGui.QMainWindow):
         
         QtCore.QObject.connect(self.ui.pushButtonCreateElection, QtCore.SIGNAL(
             "clicked()"), self.click_pushButtonCreateElection)
+        QtCore.QObject.connect(self.ui.pushButtonImportElection, QtCore.SIGNAL(
+            "clicked()"), self.click_pushButtonImportElection)
+        
 
     def init_inbox_popup_menu(self):
         # Popup menu for the Inbox tab
@@ -2605,7 +2608,16 @@ class MyForm(QtGui.QMainWindow):
         if self.dialog.exec_():
             election = self.dialog.result
             self.rerenderElections()
-            pass
+
+    def click_pushButtonImportElection(self):
+        filename = QtGui.QFileDialog.getOpenFileName(self, _translate("MainWindow", "Export election"),
+                    shared.appdata, _translate("MainWindow", "Election file (*.vote)") )
+        if filename == '':
+            return
+        
+        election = Election.readFromFile( filename )
+        election.joinChan()
+        self.rerenderElections()
 
     # Quit selected from menu or application indicator
     def quit(self):

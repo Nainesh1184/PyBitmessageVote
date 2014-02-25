@@ -1054,10 +1054,10 @@ p, li { white-space: pre-wrap; }
         <string>Voting</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_7">
-        <item row="2" column="1">
+        <item row="2" column="2">
          <widget class="QPushButton" name="pushButtonCreateElection">
           <property name="text">
-           <string>Create election</string>
+           <string>Create new election</string>
           </property>
          </widget>
         </item>
@@ -1074,7 +1074,7 @@ p, li { white-space: pre-wrap; }
           </property>
          </spacer>
         </item>
-        <item row="3" column="0" rowspan="2" colspan="2">
+        <item row="3" column="0" rowspan="2" colspan="3">
          <widget class="QTableWidget" name="tableWidgetElections">
           <property name="alternatingRowColors">
            <bool>true</bool>
@@ -1127,6 +1127,13 @@ p, li { white-space: pre-wrap; }
             <string>Chan Address</string>
            </property>
           </column>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QPushButton" name="pushButtonImportElection">
+          <property name="text">
+           <string>Import election file</string>
+          </property>
          </widget>
         </item>
        </layout>

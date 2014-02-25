@@ -21,7 +21,6 @@ class Election:
         if not dontCheck:
             self.computeAndCheckHash()
             self.computeAndCheckChanAddress()
-            self.joinChan()
         
     def checkValues(self):
         if len( self.question ) == 0:
@@ -92,7 +91,7 @@ class Election:
         cp.set( Election.voteFileSection, "hash", self.hash )
         cp.set( Election.voteFileSection, "chanAddress", self.chanAddress )
         
-        with open( filename, 'wb' ) as f:
+        with open( filename, 'w' ) as f:
             cp.write( f )
             
     def delete(self):
@@ -103,13 +102,16 @@ class Election:
         self.flush_shared_config()
         
     def flush_shared_config(self):
-        with open(shared.appdata + 'keys.dat', 'wb') as configfile:
+        with open(shared.appdata + 'keys.dat', 'w') as configfile:
             shared.config.write(configfile)
     
     @staticmethod   
     def readFromFile(filename):
+        print "Reading election from %s" % (filename)
         cp = ConfigParser()
-        cp.read( filename )
+        with open( filename, 'r' ) as f:
+            cp.readfp( f, filename )
+        print cp.sections()
         return Election( cp.get( Election.voteFileSection, "question" ),
                          json.loads( cp.get( Election.voteFileSection, "answers" ) ),
                          json.loads( cp.get( Election.voteFileSection, "voters" ) ),
