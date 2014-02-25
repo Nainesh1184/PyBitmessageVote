@@ -3175,9 +3175,12 @@ class MyForm(QtGui.QMainWindow):
             
     def on_action_electionExport(self):
         election = self.get_selected_election()
-        QMessageBox.about(self, _translate("MainWindow", "Export election"),
-            _translate("MainWindow", "Export election %s" % election.question))
-#        self.ui.tableWidgetBlacklist.removeRow(currentRow)
+        filename = QtGui.QFileDialog.getSaveFileName(self, _translate("MainWindow", "Export election"),
+                    shared.appdata, _translate("MainWindow", "Election file (*.vote)") )
+        if filename == '':
+            return
+        
+        election.saveToFile( filename )
 
     def on_action_electionDelete(self):
         currentRow = self.ui.tableWidgetElections.currentRow()
