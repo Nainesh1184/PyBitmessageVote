@@ -3699,7 +3699,11 @@ class NewCreateElectionDialog(QtGui.QDialog):
                         "MainWindow", "You need to enter at least three voter addresses."))
         else:
             from voting import Election
-            self.result = Election( self.question, self.answers, self.voters )
+            # First convert from QStrings to normal Python strings
+            question = str( self.question )
+            answers = map( lambda s: str( s ), self.answers )
+            voters = map( lambda s: str( s ), self.voters )
+            self.result = Election( question, answers, voters )
             QtGui.QDialog.accept(self)
         
     def refresh_answers(self):
