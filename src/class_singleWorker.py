@@ -850,24 +850,33 @@ class singleWorker(threading.Thread):
             # If we are sending to ourselves or a chan, let's put the message in
             # our own inbox.
             if shared.config.has_section(toaddress):
-                t = (inventoryHash, toaddress, fromaddress, subject, int(
-                    time.time()), message, 'inbox', 2, 0)
-                helper_inbox.insert(t)
-
-                shared.UISignalQueue.put(('displayNewInboxMessage', (
-                    inventoryHash, toaddress, fromaddress, subject, message)))
-
-                # If we are behaving as an API then we might need to run an
-                # outside command to let some program know that a new message
-                # has arrived.
-                if shared.safeConfigGetBoolean('bitmessagesettings', 'apienabled'):
-                    try:
-                        apiNotifyPath = shared.config.get(
-                            'bitmessagesettings', 'apinotifypath')
-                    except:
-                        apiNotifyPath = ''
-                    if apiNotifyPath != '':
-                        call([apiNotifyPath, "newMessage"])
+                isVote = False
+                if shared.safeConfigGetBoolean(toaddress, 'vote'):
+                    from voting import Election
+                    election = Election.readFromAddress(toaddress)
+                    if election is not None:
+                        election.receivedVote(fromaddress, embeddedTime, message)
+                        isVote = True
+            
+                if not isVote:
+                    t = (inventoryHash, toaddress, fromaddress, subject, int(
+                        time.time()), message, 'inbox', 2, 0)
+                    helper_inbox.insert(t)
+    
+                    shared.UISignalQueue.put(('displayNewInboxMessage', (
+                        inventoryHash, toaddress, fromaddress, subject, message)))
+    
+                    # If we are behaving as an API then we might need to run an
+                    # outside command to let some program know that a new message
+                    # has arrived.
+                    if shared.safeConfigGetBoolean('bitmessagesettings', 'apienabled'):
+                        try:
+                            apiNotifyPath = shared.config.get(
+                                'bitmessagesettings', 'apinotifypath')
+                        except:
+                            apiNotifyPath = ''
+                        if apiNotifyPath != '':
+                            call([apiNotifyPath, "newMessage"])
 
     def requestPubKey(self, toAddress):
         toStatus, addressVersionNumber, streamNumber, ripe = decodeAddress(

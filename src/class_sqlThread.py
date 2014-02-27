@@ -71,6 +71,14 @@ class sqlThread(threading.Thread):
                 sys.stderr.write(
                     'ERROR trying to create database file (message.dat). Error message: %s\n' % str(err))
                 os._exit(0)
+                
+        try:
+            self.cur.execute('''CREATE TABLE votes (chanaddress text, senderaddress text, time bigint, data blob, answer int)''')
+        except Exception as err:
+            if str(err) != 'table votes already exists':
+                sys.stderr.write(
+                    'ERROR trying to create votes table. Error message: %s\n' % str(err))
+                os._exit(0)
 
         if shared.config.getint('bitmessagesettings', 'settingsversion') == 1:
             shared.config.set('bitmessagesettings', 'settingsversion', '2')

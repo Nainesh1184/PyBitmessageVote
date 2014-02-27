@@ -610,7 +610,19 @@ class objectProcessor(threading.Thread):
             else:
                 body = 'Unknown encoding type.\n\n' + repr(message)
                 subject = ''
-            if messageEncodingType != 0:
+            
+            # Check if the address is a vote address.
+            # If it is, we wont treat the message as a normal message,
+            # but instead as a vote    
+            isVote = False
+            if shared.safeConfigGetBoolean(toAddress, 'vote'):
+                from voting import Election
+                election = Election.readFromAddress(toAddress)
+                if election is not None:
+                    election.receivedVote(fromAddress, embeddedTime, body)
+                    isVote = True
+            
+            if messageEncodingType != 0 and not isVote:
                 t = (inventoryHash, toAddress, fromAddress, subject, int(
                     time.time()), body, 'inbox', messageEncodingType, 0)
                 helper_inbox.insert(t)

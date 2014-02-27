@@ -6,6 +6,7 @@ import json
 import time
 from pyelliptic.openssl import OpenSSL
 
+from debug import logger
 from addresses import decodeAddress
 from helper_sql import sqlExecute
 import shared
@@ -88,9 +89,31 @@ class Election:
         ackdata = OpenSSL.rand(32)
         _, _, _, ripe = decodeAddress( self.chanAddress )
         subject = self.question
-        t = ('', self.chanAddress, ripe, fromAddress, subject, answerNo,
+        data = self.encodeVote( answerNo )
+        t = ('', self.chanAddress, ripe, fromAddress, subject, data,
              ackdata, int(time.time()), 'msgqueued', 1, 1, 'sent', 2)
         sqlExecute( 'INSERT INTO sent VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', *t )
+        shared.workerQueue.put(('sendmessage', self.chanAddress))
+                
+    def receivedVote(self, fromAddress, msgTime, data):
+        answerNo, = self.decodeVote( data )
+        if answerNo < 0 or answerNo >= len( self.answers ):
+            logger.warning( "Vote (%d) received from %s in election '%s' is invalid number" %
+                            ( answerNo, fromAddress, self.question ) )
+            return
+        
+        logger.info( "Received vote (%d) from %s in election '%s'" %
+                     ( answerNo, fromAddress, self.question ) )
+        t = (self.chanAddress, fromAddress, msgTime, data, answerNo)
+        sqlExecute( 'INSERT INTO votes VALUES (?,?,?,?,?)', *t )
+    
+    def encodeVote(self, answerNo):
+        data = pack( '>I', answerNo )
+        return data
+    
+    def decodeVote(self, data):
+        answerNo, = unpack( '>I', data[0:4])
+        return (answerNo,)
         
     def createChanLabel(self):
         return str( "%s %s" % ( self.chanLabelPrefix, self.question ) )
