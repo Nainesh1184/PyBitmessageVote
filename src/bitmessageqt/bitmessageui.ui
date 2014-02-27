@@ -1068,7 +1068,7 @@ p, li { white-space: pre-wrap; }
        <attribute name="title">
         <string>Voting</string>
        </attribute>
-       <widget class="QWidget" name="">
+       <widget class="QWidget" name="layoutWidget">
         <property name="geometry">
          <rect>
           <x>9</x>
@@ -1077,7 +1077,7 @@ p, li { white-space: pre-wrap; }
           <height>491</height>
          </rect>
         </property>
-        <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,1,1,0,0">
+        <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,1,1,0,0,0">
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="1,0,0">
            <item>
@@ -1167,16 +1167,42 @@ p, li { white-space: pre-wrap; }
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,1">
            <item>
-            <layout class="QVBoxLayout" name="verticalLayout_4" stretch="0,1">
+            <layout class="QVBoxLayout" name="verticalLayout_4" stretch="0,0">
              <item>
               <widget class="QLabel" name="label_7">
                <property name="text">
-                <string>Possible answers</string>
+                <string>Answers</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QListWidget" name="listWidgetElectionAnswers"/>
+              <widget class="QTableWidget" name="tableWidgetElectionAnswers">
+               <property name="alternatingRowColors">
+                <bool>true</bool>
+               </property>
+               <property name="selectionMode">
+                <enum>QAbstractItemView::SingleSelection</enum>
+               </property>
+               <property name="selectionBehavior">
+                <enum>QAbstractItemView::SelectRows</enum>
+               </property>
+               <attribute name="horizontalHeaderDefaultSectionSize">
+                <number>100</number>
+               </attribute>
+               <column>
+                <property name="text">
+                 <string>Answer</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>Votes</string>
+                </property>
+                <property name="textAlignment">
+                 <set>AlignRight|AlignVCenter</set>
+                </property>
+               </column>
+              </widget>
              </item>
             </layout>
            </item>
@@ -1195,6 +1221,13 @@ p, li { white-space: pre-wrap; }
             </layout>
            </item>
           </layout>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButtonElectionComputeResult">
+           <property name="text">
+            <string>Compute result</string>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QLabel" name="label_9">

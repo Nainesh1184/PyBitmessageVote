@@ -8,7 +8,7 @@ from pyelliptic.openssl import OpenSSL
 
 from debug import logger
 from addresses import decodeAddress
-from helper_sql import sqlExecute
+from helper_sql import sqlExecute, sqlQuery
 import shared
 
 class Election:
@@ -114,7 +114,47 @@ class Election:
     def decodeVote(self, data):
         answerNo, = unpack( '>I', data[0:4])
         return (answerNo,)
+    
+    def get_duplicate_vote_addresses(self):
+        return sqlQuery( 'SELECT senderaddress FROM votes WHERE chanaddress=? GROUP BY senderaddress HAVING COUNT(*) > 1', self.chanAddress )
+    
+    def get_answers_and_votes(self):
+        # Return rows each having (answerNo, amount_votes) for each answerNo having more than 0 votes
+        # Doesn't count votes from addresses which have sent more than one vote
+        votes_by_answer = dict( sqlQuery('''SELECT answer, COUNT(*) FROM votes WHERE chanaddress=? AND senderaddress NOT IN (
+        SELECT senderaddress FROM votes WHERE chanaddress=? GROUP BY senderaddress HAVING COUNT(*) > 1)
+        GROUP BY answer''', self.chanAddress, self.chanAddress ) )
         
+        result = []
+        
+        for i in range( len( self.answers ) ):
+            result.append( ( self.answers[i], votes_by_answer[i] if votes_by_answer.has_key(i) else 0 ) )
+
+        return result
+#         
+#         print voterows
+#         print "****************"
+#         return voterows
+#         # Find senders who have sent more than one vote
+#         from collections import Counter
+#         address_count = Counter( [ row[0] for row in voterows ])
+#         duplicate_vote_addresses = [ address for address in address_count if address_count[address] > 1 ]
+#         
+#         # Remove duplicate vote senders from our votes
+#         if len( duplicate_vote_addresses ) > 0:
+#             logger.info( 'Duplicate votes detected from %d addresses: %s' % ( len( duplicate_vote_addresses ), duplicate_vote_addresses ) )
+#         valid_votes = [ row[1] for row in voterows if row[0] not in duplicate_vote_addresses ]
+# 
+#         vote_count = Counter( valid_votes )
+#         answer_votes = [ (self.answers[i], vote_count[i] ) for i in range( len( self.answers ) ) ]
+#        logger.info( 'Valid votes: %d (%s)' % ( len( valid_votes ), valid_votes ) )
+#        logger.info( 'Result: %s' % answer_votes )
+#        logger.info( '%s' % vote_count )        
+#         return answer_votes
+        
+    def compute_result(self):
+        pass
+    
     def createChanLabel(self):
         return str( "%s %s" % ( self.chanLabelPrefix, self.question ) )
     
@@ -124,7 +164,11 @@ class Election:
         cp.set( Election.voteFileSection, "question", self.question )
         cp.set( Election.voteFileSection, "answers", json.dumps( self.answers, encoding='ascii' ) )
         cp.set( Election.voteFileSection, "voters", json.dumps( self.voters, encoding='ascii' ) )
+        if self.hash is None:
+            self.computeAndCheckHash()
         cp.set( Election.voteFileSection, "hash", self.hash )
+        if self.chanAddress is None:
+            self.computeAndCheckChanAddress()
         cp.set( Election.voteFileSection, "chanAddress", self.chanAddress )
         
         with open( filename, 'w' ) as f:
@@ -166,8 +210,6 @@ class Election:
                          json.loads( shared.config.get( address, 'voters' ) ),
                          chanAddress=address,
                          dontCheck=True )
-        
-        
         
     def __str__(self):
         return "Election<%s (%d,%d,%s,%s)>" % ( self.question, len( self.answers ), len( self.voters ), self.chanAddress, self.hash )

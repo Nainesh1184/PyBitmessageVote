@@ -232,6 +232,8 @@ class MyForm(QtGui.QMainWindow):
             "clicked()"), self.click_pushButtonCreateElection)
         QtCore.QObject.connect(self.ui.pushButtonImportElection, QtCore.SIGNAL(
             "clicked()"), self.click_pushButtonImportElection)
+        QtCore.QObject.connect(self.ui.pushButtonElectionComputeResult, QtCore.SIGNAL(
+            "clicked()"), self.click_pushButtonElectionComputeResult)
         QtCore.QObject.connect(self.ui.pushButtonElectionVote, QtCore.SIGNAL(
             "clicked()"), self.click_pushButtonElectionVote)
         
@@ -2625,6 +2627,12 @@ class MyForm(QtGui.QMainWindow):
         election.joinChan()
         self.rerenderElections()
 
+    def click_pushButtonElectionComputeResult(self):
+        election = self.get_selected_election()
+        if election is None:
+            return
+        election.compute_result()
+
     def click_pushButtonElectionVote(self):
         fromAddress = str( self.ui.comboboxElectionAddress.currentText() )
         answerNo = self.ui.comboboxElectionAnswer.currentIndex()
@@ -3208,14 +3216,23 @@ class MyForm(QtGui.QMainWindow):
             
     def tableWidgetElectionItemClicked(self):
         election = self.get_selected_election()
-        self.ui.listWidgetElectionAnswers.clear()
+        self.ui.tableWidgetElectionAnswers.setRowCount( 0 )
         self.ui.listWidgetElectionVoters.clear()
         self.ui.comboboxElectionAddress.clear()
         self.ui.comboboxElectionAnswer.clear()
         if election is not None:
-            for answer in election.answers:
-                newItem = QListWidgetItem( answer )
-                self.ui.listWidgetElectionAnswers.addItem( newItem )
+            for answer, votes in election.get_answers_and_votes():
+                self.ui.tableWidgetElectionAnswers.insertRow(0)
+                
+                newItem = QTableWidgetItem( answer )
+                newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+                self.ui.tableWidgetElectionAnswers.setItem(0, 0, newItem)
+                
+                newItem = QTableWidgetItem( str( votes ) )
+                newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+                newItem.setTextAlignment( Qt.AlignRight | Qt.AlignVCenter )
+                self.ui.tableWidgetElectionAnswers.setItem(0, 1, newItem)
+
                 self.ui.comboboxElectionAnswer.addItem( answer, answer )
 
             myAddressVoterFont = QFont()
