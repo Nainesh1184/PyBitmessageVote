@@ -2054,7 +2054,7 @@ class MyForm(QtGui.QMainWindow):
         self.ui.labelFrom.setText('')
         configSections = shared.config.sections()
         for addressInKeysFile in configSections:
-            if addressInKeysFile != 'bitmessagesettings':
+            if addressInKeysFile != 'bitmessagesettings' and not shared.safeConfigGetBoolean(addressInKeysFile, 'vote'):
                 isEnabled = shared.config.getboolean(
                     addressInKeysFile, 'enabled')  # I realize that this is poor programming practice but I don't care. It's easier for others to read.
                 if isEnabled:
