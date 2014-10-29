@@ -612,7 +612,7 @@ class ConsensusProtocol:
             log_warn( "Received metadata mismatch! %s!=%s OR %s!=%s" % ( repr( self.hash), repr( new_hash), repr( self.chan_address), repr( new_chan_address ) ) )
             return
         
-        self.data = data
+        self.data = new_data
         self.__init_data__()
         self.store()
         log_info( "Received metadata correctly." )
