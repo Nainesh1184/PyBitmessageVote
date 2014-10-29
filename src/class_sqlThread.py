@@ -76,6 +76,19 @@ class sqlThread(threading.Thread):
                 sys.stderr.write(
                     'ERROR trying to create database file (message.dat). Error message: %s\n' % str(err))
                 os._exit(0)
+                
+        try:
+            self.cur.execute('''CREATE TABLE consensus (id INTEGER PRIMARY KEY AUTOINCREMENT, chanaddress text, hash text,
+                                data BLOB, settings TEXT, UNIQUE(chanaddress))''')
+            self.cur.execute('''CREATE TABLE consensus_messages (consensus_id INTEGER, local_time BIGINT, message BLOB,
+                                                                 message_hash BLOB, state INTEGER)''')
+            self.conn.commit()
+        except Exception as err:
+            if str(err) != 'table consensus already exists':
+                sys.stderr.write(
+                    'ERROR trying to create consensus table. Error message: %s\n' % str(err))
+                os._exit(0)
+
 
         if shared.config.getint('bitmessagesettings', 'settingsversion') == 1:
             shared.config.set('bitmessagesettings', 'settingsversion', '2')

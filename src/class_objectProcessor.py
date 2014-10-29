@@ -22,6 +22,8 @@ import tr
 from debug import logger
 import l10n
 
+from consensus import ConsensusProtocol, VotingData
+
 
 class objectProcessor(threading.Thread):
     """
@@ -328,6 +330,7 @@ class objectProcessor(threading.Thread):
             tag = data[readPosition:readPosition + 32]
             if tag not in shared.neededPubkeys:
                 logger.info('We don\'t need this v4 pubkey. We didn\'t ask for it.')
+                logger.debug('neededPubkeys: %s' % ( shared.neededPubkeys, ) )
                 return
             
             # Let us try to decrypt the pubkey
@@ -571,6 +574,8 @@ class objectProcessor(threading.Thread):
         toLabel = shared.config.get(toAddress, 'label')
         if toLabel == '':
             toLabel = toAddress
+            
+        isConsensusProtocolMessage = False
 
         if messageEncodingType == 2:
             subject, body = self.decodeType2Message(message)
@@ -581,7 +586,11 @@ class objectProcessor(threading.Thread):
         elif messageEncodingType == 0:
             logger.info('messageEncodingType == 0. Doing nothing with the message. They probably just sent it so that we would store their public key or send their ack data for them.')
             subject = ''
-            body = '' 
+            body = ''
+        elif messageEncodingType == ConsensusProtocol.ENCODING_TYPE:
+            isConsensusProtocolMessage = True
+            subject = ''
+            body = ''
         else:
             body = 'Unknown encoding type.\n\n' + repr(message)
             subject = ''
@@ -589,7 +598,13 @@ class objectProcessor(threading.Thread):
         if helper_inbox.isMessageAlreadyInInbox(toAddress, fromAddress, subject, body, messageEncodingType):
             logger.info('This msg is already in our inbox. Ignoring it.')
             blockMessage = True
-        if not blockMessage:
+            
+        if isConsensusProtocolMessage:
+            cp = ConsensusProtocol.read_from_address( toAddress )
+            if cp is not None:
+                cp.received_message( message )
+            
+        elif not blockMessage:
             if messageEncodingType != 0:
                 t = (inventoryHash, toAddress, fromAddress, subject, int(
                     time.time()), body, 'inbox', messageEncodingType, 0)
@@ -1003,6 +1018,7 @@ class objectProcessor(threading.Thread):
             status, addressVersion, streamNumber, ripe = decodeAddress(address)
             tag = hashlib.sha512(hashlib.sha512(encodeVarint(
                 addressVersion) + encodeVarint(streamNumber) + ripe).digest()).digest()[32:]
+            VotingData.public_key_received( address )
             if tag in shared.neededPubkeys:
                 logger.info('We have been awaiting the arrival of this pubkey.')
                 del shared.neededPubkeys[tag]

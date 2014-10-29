@@ -65,6 +65,8 @@ import helper_generic
 
 from subprocess import call
 import time
+
+import consensus
     
 
 def connectToStream(streamNumber):
@@ -200,6 +202,14 @@ class Main:
         singleCleanerThread.daemon = True  # close the main program even if there are threads left
         singleCleanerThread.start()
 
+        # Queue all elections for loading by the single worker thread
+        consensus.ConsensusProtocol.get_all() 
+
+        # Start the Bitcoin helper thread
+        bitcoinThread = consensus.bitcoin_helper.BitcoinThread()
+        bitcoinThread.daemon = True  # close the main program even if there are threads left
+        bitcoinThread.start()
+        
         shared.reloadMyAddressHashes()
         shared.reloadBroadcastSendersForWhichImWatching()
 
