@@ -769,9 +769,9 @@ class MyForm(QtGui.QMainWindow):
 
         sqlStatement = '''
             SELECT toaddress, fromaddress, subject, status, ackdata, lastactiontime 
-            FROM sent WHERE folder="sent" AND %s LIKE ? 
+            FROM sent WHERE folder="sent" AND %s LIKE ? AND encodingtype != %d
             ORDER BY lastactiontime
-            ''' % (where,)
+            ''' % (where,ConsensusProtocol.ENCODING_TYPE)
 
         while self.ui.tableWidgetSent.rowCount() > 0:
             self.ui.tableWidgetSent.removeRow(0)

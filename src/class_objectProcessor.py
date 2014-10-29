@@ -589,6 +589,8 @@ class objectProcessor(threading.Thread):
             body = ''
         elif messageEncodingType == ConsensusProtocol.ENCODING_TYPE:
             isConsensusProtocolMessage = True
+            subject = ''
+            body = ''
         else:
             body = 'Unknown encoding type.\n\n' + repr(message)
             subject = ''
