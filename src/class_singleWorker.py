@@ -14,6 +14,7 @@ from helper_sql import *
 import helper_inbox
 from helper_generic import addDataPadding
 import l10n
+from consensus import ConsensusProtocol, VotingData
 
 # This thread, of which there is only one, does the heavy lifting:
 # calculating POWs.
@@ -76,6 +77,16 @@ class singleWorker(threading.Thread):
                 self.sendOutOrStoreMyV3Pubkey(data)
             elif command == 'sendOutOrStoreMyV4Pubkey':
                 self.sendOutOrStoreMyV4Pubkey(data)
+            elif command == 'requestPubkey':
+                self.requestPubKey( data )
+            elif command == 'loadElection':
+                cp = data
+                cp.load()
+            elif command == 'initializeElection':
+                cp = data
+                cp.initialize()
+            elif command == 'castVote':
+                VotingData.compute_and_cast_vote(*data)
             else:
                 with shared.printLock:
                     sys.stderr.write(
@@ -517,12 +528,12 @@ class singleWorker(threading.Thread):
             
             # Select just one msg that needs work.
             queryreturn = sqlQuery(
-                '''SELECT toaddress, toripe, fromaddress, subject, message, ackdata, status FROM sent WHERE (status='msgqueued' or status='doingmsgpow' or status='forcepow') and folder='sent' LIMIT 1''')
+                '''SELECT toaddress, toripe, fromaddress, subject, message, ackdata, status, encodingtype FROM sent WHERE (status='msgqueued' or status='doingmsgpow' or status='forcepow') and folder='sent' LIMIT 1''')
             if len(queryreturn) == 0: # if there is no work to do then 
                 break                 # break out of this sendMsg loop and 
                                       # wait for something to get put in the shared.workerQueue.
             row = queryreturn[0]
-            toaddress, toripe, fromaddress, subject, message, ackdata, status = row
+            toaddress, toripe, fromaddress, subject, message, ackdata, status, encodingtype = row
             toStatus, toAddressVersionNumber, toStreamNumber, toRipe = decodeAddress(
                 toaddress)
             fromStatus, fromAddressVersionNumber, fromStreamNumber, fromRipe = decodeAddress(
@@ -773,7 +784,7 @@ class singleWorker(threading.Thread):
                 payload += pubEncryptionKey[1:]
 
                 payload += toRipe  # This hash will be checked by the receiver of the message to verify that toRipe belongs to them. This prevents a Surreptitious Forwarding Attack.
-                payload += '\x02'  # Type 2 is simple UTF-8 message encoding as specified on the Protocol Specification on the Bitmessage Wiki.
+                payload += encodeVarint( encodingtype )
                 messageToTransmit = 'Subject:' + \
                     subject + '\n' + 'Body:' + message
                 payload += encodeVarint(len(messageToTransmit))
@@ -839,7 +850,7 @@ class singleWorker(threading.Thread):
                         fromaddress, 'payloadlengthextrabytes'))
 
                 payload += toRipe  # This hash will be checked by the receiver of the message to verify that toRipe belongs to them. This prevents a Surreptitious Forwarding Attack.
-                payload += '\x02'  # Type 2 is simple UTF-8 message encoding as specified on the Protocol Specification on the Bitmessage Wiki.
+                payload += encodeVarint( encodingtype )
                 messageToTransmit = 'Subject:' + \
                     subject + '\n' + 'Body:' + message
                 payload += encodeVarint(len(messageToTransmit))
@@ -928,24 +939,29 @@ class singleWorker(threading.Thread):
             # If we are sending to ourselves or a chan, let's put the message in
             # our own inbox.
             if shared.config.has_section(toaddress):
-                t = (inventoryHash, toaddress, fromaddress, subject, int(
-                    time.time()), message, 'inbox', 2, 0)
-                helper_inbox.insert(t)
-
-                shared.UISignalQueue.put(('displayNewInboxMessage', (
-                    inventoryHash, toaddress, fromaddress, subject, message)))
-
-                # If we are behaving as an API then we might need to run an
-                # outside command to let some program know that a new message
-                # has arrived.
-                if shared.safeConfigGetBoolean('bitmessagesettings', 'apienabled'):
-                    try:
-                        apiNotifyPath = shared.config.get(
-                            'bitmessagesettings', 'apinotifypath')
-                    except:
-                        apiNotifyPath = ''
-                    if apiNotifyPath != '':
-                        call([apiNotifyPath, "newMessage"])
+                if encodingtype == ConsensusProtocol.ENCODING_TYPE:
+                    cp = ConsensusProtocol.read_from_address( toaddress )
+                    if cp is not None:
+                        cp.received_message( message )
+                else:                    
+                    t = (inventoryHash, toaddress, fromaddress, subject, int(
+                        time.time()), message, 'inbox', 2, 0)
+                    helper_inbox.insert(t)
+    
+                    shared.UISignalQueue.put(('displayNewInboxMessage', (
+                        inventoryHash, toaddress, fromaddress, subject, message)))
+    
+                    # If we are behaving as an API then we might need to run an
+                    # outside command to let some program know that a new message
+                    # has arrived.
+                    if shared.safeConfigGetBoolean('bitmessagesettings', 'apienabled'):
+                        try:
+                            apiNotifyPath = shared.config.get(
+                                'bitmessagesettings', 'apinotifypath')
+                        except:
+                            apiNotifyPath = ''
+                        if apiNotifyPath != '':
+                            call([apiNotifyPath, "newMessage"])
 
     def requestPubKey(self, toAddress):
         toStatus, addressVersionNumber, streamNumber, ripe = decodeAddress(
@@ -966,6 +982,8 @@ class singleWorker(threading.Thread):
             tag = hashlib.sha512(hashlib.sha512(encodeVarint(addressVersionNumber)+encodeVarint(streamNumber)+ripe).digest()).digest()[32:] # Note that this is the second half of the sha512 hash.
             if tag not in shared.neededPubkeys:
                 shared.neededPubkeys[tag] = (toAddress, highlevelcrypto.makeCryptor(privEncryptionKey.encode('hex'))) # We'll need this for when we receive a pubkey reply: it will be encrypted and we'll need to decrypt it.
+                
+        logger.debug( "requestPubkey: %s" % ( shared.neededPubkeys, ) )
         
         TTL = 2.5 * 24 * 60 * 60 # 2.5 days
         embeddedTime = int(time.time() + random.randrange(-300, 300) + TTL)  # 2.5 days from now plus or minus five minutes

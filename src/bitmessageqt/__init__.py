@@ -37,6 +37,11 @@ import datetime
 from helper_sql import *
 import l10n
 
+from consensus import BitcoinThread, ConsensusProtocol, ConsensusTimeData, helper_keys, VotingData
+from createelectiondialog import Ui_CreateElectionDialog
+from electiondetailsdialog import Ui_ElectionDetailsDialog
+from timestampersettingsdialog import Ui_TimestamperSettingsDialog
+
 try:
     from PyQt4 import QtCore, QtGui
     from PyQt4.QtCore import *
@@ -541,6 +546,8 @@ class MyForm(QtGui.QMainWindow):
 
         # Initialize the Subscriptions
         self.rerenderSubscriptions()
+        
+        self.init_voting()
 
         # Initialize the inbox search
         QtCore.QObject.connect(self.ui.inboxSearchLineEdit, QtCore.SIGNAL(
@@ -623,6 +630,10 @@ class MyForm(QtGui.QMainWindow):
             "rerenderSubscriptions()"), self.rerenderSubscriptions)
         QtCore.QObject.connect(self.UISignalThread, QtCore.SIGNAL(
             "removeInboxRowByMsgid(PyQt_PyObject)"), self.removeInboxRowByMsgid)
+        QtCore.QObject.connect(self.UISignalThread, QtCore.SIGNAL(
+            "refresh_election_ui(PyQt_PyObject)"), self.refresh_election_ui)
+        QtCore.QObject.connect(self.UISignalThread, QtCore.SIGNAL(
+            "election_initialized(PyQt_PyObject)"), self.election_initialized)
         QtCore.QObject.connect(self.UISignalThread, QtCore.SIGNAL(
             "displayAlert(PyQt_PyObject,PyQt_PyObject,PyQt_PyObject)"), self.displayAlert)
         self.UISignalThread.start()
@@ -3084,6 +3095,9 @@ class MyForm(QtGui.QMainWindow):
         currentRow = self.ui.tableWidgetYourIdentities.currentRow()
         addressAtCurrentRow = str(
             self.ui.tableWidgetYourIdentities.item(currentRow, 1).text())
+        if shared.safeConfigGetBoolean(str(addressAtCurrentRow), 'consensus'):
+            QMessageBox.information( self, "Deleting a voting address", "This is a voting address. To remove it, please do so from the voting tab." )
+            return
         shared.config.set(str(addressAtCurrentRow), 'enabled', 'false')
         self.ui.tableWidgetYourIdentities.item(
             currentRow, 0).setTextColor(QtGui.QColor(128, 128, 128))
@@ -3347,6 +3361,641 @@ class MyForm(QtGui.QMainWindow):
                 print 'Status bar:', data
 
         self.statusBar().showMessage(data)
+
+
+
+            
+    def init_voting(self):
+        self.ui.comboBoxVotingElection.currentIndexChanged.connect( self.comboBoxVotingElectionIndexChanged )
+        self.ui.pushButtonVotingCreateElection.clicked.connect( self.pushButtonVotingCreateElectionClicked )
+        self.ui.pushButtonVotingJoinElection.clicked.connect( self.pushButtonVotingJoinElectionClicked )
+
+        self.ui.pushButtonVotingDebug.clicked.connect( self.pushButtonVotingDebugClicked )
+        self.ui.pushButtonVotingTimestamper.clicked.connect( self.pushButtonVotingTimestamperClicked )
+        self.ui.pushButtonVotingDetails.clicked.connect( self.pushButtonVotingDetailsClicked )
+        
+        self.ui.tableWidgetVotingAllResults.itemSelectionChanged.connect( self.tableWidgetVotingAllResultsItemChanged )
+        
+        self.ui.comboBoxVotingMultipleAddresses.currentIndexChanged.connect( self.comboBoxVotingMultipleAddressesIndexChanged )
+        self.ui.comboBoxVotingVote.currentIndexChanged.connect( self.comboBoxVotingVoteIndexChanged )
+        self.ui.pushButtonVotingCastVote.clicked.connect( self.pushButtonVotingCastVoteClicked )
+        
+        self.init_voting_options_button()
+
+        self.voting_phase_timer = None
+        self.current_election = None
+        self.current_election_result = None
+        self.current_election_voter_address = None
+        self.current_election_answer = None
+        self.refresh_elections()
+        
+#    def fix_voting_widgets_stretch(self):
+
+    def refresh_elections(self, selected_election=None):
+        self.ui.comboBoxVotingElection.clear()
+        selected_election = selected_election or self.current_election
+
+        self.elections = [cp for cp in ConsensusProtocol.get_all()]
+        for el in self.elections:
+            # Don't mind the empty label, we'll set it later in refresh_election_combobox_statuses()
+            self.ui.comboBoxVotingElection.addItem( avatarize( el.hash ), "" )
+        if selected_election in self.elections:
+            self.ui.comboBoxVotingElection.setCurrentIndex( self.elections.index( selected_election ) )
+            
+        if len( self.elections ) > 0:
+            self.ui.comboBoxVotingElection.setEnabled( True )
+        else:
+            self.ui.comboBoxVotingElection.setEnabled( False )
+            self.ui.comboBoxVotingElection.addItem( "(Create or import an election first)" )
+            
+        self.refresh_election_combobox_statuses()
+        
+    def refresh_election_ui(self, election ):
+        self.refresh_election_combobox_statuses()
+        if election == self.current_election:
+            self.refresh_election( election )
+
+    def refresh_election_combobox_statuses(self):
+        for el, i in zip( self.elections, range( len( self.elections ) ) ):
+            name = el.data.question if el.data is not None else el.hash[:16]
+            self.ui.comboBoxVotingElection.setItemText( i, "%s (%s)" % ( name, get_election_status_text( el ) ) )
+            
+    def comboBoxVotingElectionIndexChanged(self, index):
+        if len( self.elections ) == 0:
+            self.current_election = None
+        else:
+            self.current_election = self.elections[index] if index >= 0 else None
+            
+        self.refresh_election( self.current_election )
+        
+    def format_seconds_as_time_left(self, seconds):
+        plural = lambda count: "s" if count != 1 else ""
+            
+        if seconds < 60:
+            return "very soon..."
+        
+        minutes, seconds = int( seconds / 60 ), seconds % 60
+        if minutes < 60:
+            return "%d minute%s" % ( minutes, plural(minutes) )
+        
+        hours, minutes = int( minutes / 60 ), minutes % 60
+        if hours < 24:
+            if minutes > 0:
+                return "%d hour%s and %d minute%s" % ( hours, plural(hours), minutes, plural(minutes) )
+            else:
+                return "%d hour%s" % ( hours, plural(hours) )
+        
+        days, hours = int( hours / 24 ), hours % 24
+        if hours > 0:
+            return "%d day%s, %d hour%s" % ( days, plural(days), hours, plural(hours) )
+        else:
+            return "%d day%s" % ( days, plural(days) )
+        
+    def refresh_election(self, election):
+        valid_election = election is not None and election.data is not None \
+                        and election.initialized and election.data.has_all_public_keys()
+        awaiting_pubkeys = False
+        if valid_election:
+
+            self.ui.labelVotingQuestion.setText( election.data.question )
+            self.ui.labelVotingStatus.setText( get_election_status_text( election ) )
+            
+            status = election.get_status()
+            if status <= ConsensusProtocol.STATUS_COMMITMENT_PHASE:
+                if self.voting_phase_timer is None:
+                    self.voting_phase_timer = QTimer( self )
+                    self.voting_phase_timer.timeout.connect( self.voting_phase_timer_tick )
+                    self.voting_phase_timer.setInterval( 1000 )
+                self.voting_phase_timer.start()
+                self.voting_phase_timer_tick()
+                self.ui.widgetVotingTimer.show()
+                
+            else:
+                self.ui.widgetVotingTimer.hide()
+        
+        else:
+            
+            unknown_election = election is not None and election.data is None
+            if unknown_election:
+                self.ui.labelVotingQuestion.setText( election.hash[:32] )
+                self.ui.labelVotingStatus.setText( get_election_status_text( election ) )
+            else:
+                self.ui.labelVotingQuestion.setText( "No election selected" )
+                self.ui.labelVotingStatus.setText( "" )
+                
+            if self.voting_phase_timer is not None:
+                self.voting_phase_timer.stop()
+            self.ui.widgetVotingTimer.hide()
+            
+            
+            if election is not None:
+                self.ui.labelVotingQuestion.setText( election.data.question )
+                if not election.initialized:
+                    self.ui.labelVotingStatus.setText( "Loading... Please wait" )
+                    self.ui.widgetVotingTimer.hide()
+                    election = None
+                elif not election.data.has_all_public_keys():
+                    self.ui.labelVotingStatus.setText( "Waiting for public keys... Please wait" )
+                    self.ui.widgetVotingTimer.hide()
+                    election = None
+                    awaiting_pubkeys = True
+            
+        self.ui.pushButtonVotingDebug.setEnabled( valid_election )
+        self.ui.pushButtonVotingTimestamper.setEnabled( valid_election and status <= ConsensusProtocol.STATUS_POSTING )
+        self.ui.pushButtonVotingDetails.setEnabled( valid_election or awaiting_pubkeys )
+        self.ui.pushButtonVotingOptions.setEnabled( valid_election or awaiting_pubkeys )
+        
+        self.refresh_votes_table(election)
+        self.refresh_pushButtonVotingTimestamperText(election)
+        self.refresh_result_table(election)
+        self.refresh_results_widget(election)
+        self.refresh_vote_actions(election)
+        
+    def pushButtonVotingCreateElectionClicked(self):
+        self.dialog = NewCreateElectionDialog(self)
+        if self.dialog.exec_():
+            election = self.dialog.result
+        
+    def pushButtonVotingJoinElectionClicked(self):
+        self.voting_join_menu = QtGui.QMenu(self)
+
+        action = QtGui.QAction( "Join by election hash", self )
+        action.triggered.connect( self.actionVotingJoinHash )
+        self.voting_join_menu.addAction( action )
+        
+        self.voting_join_menu.addSeparator()
+
+        action = QtGui.QAction( "Import election from file", self )
+        action.triggered.connect( self.actionVotingJoinImportFile )
+        self.voting_join_menu.addAction( action )
+        
+        self.voting_join_menu.exec_( self.ui.pushButtonVotingJoinElection.mapToGlobal(QPoint(0,self.ui.pushButtonVotingJoinElection.size().height())));
+
+        
+    def actionVotingJoinHash(self):
+        text, ok = QtGui.QInputDialog.getText(self, 'Join election', '<b>Enter the full election hash (64 characters):</b><br><br>Note that another peer with the election data must broadcast<br>their data after you have joined this election.')
+        hash = str( text.trimmed() )
+        if ok:
+            try:
+                hash.decode('hex')
+                assert len( hash ) == 64
+            except Exception, e:
+                QtGui.QMessageBox.warning(self, "Invalid hash", "You didn't enter a valid hash, %s" % e )
+                # Let user try again
+                self.actionVotingJoinHash()
+                
+            else:
+                ConsensusProtocol.join( hash )
+        
+    def actionVotingJoinImportFile(self):
+        filename = QtGui.QFileDialog.getOpenFileName(self, _translate("MainWindow", "Export election"),
+                    shared.appdata, _translate("MainWindow", "Election file (*.vote)") )
+        if filename == '':
+            return
+        
+        election = ConsensusProtocol.read_from_file( filename )
+        
+    def election_initialized(self, election):
+        self.refresh_elections(election)
+        if election.data is not None:
+            if election.data.settings_get_first_load():
+                election.data.settings_set_first_load(False)
+                self.show_dialog_asking_about_timestamper(election)
+        
+    def show_dialog_asking_about_timestamper(self, election):
+        if election is None:
+            return
+        
+        def callback():
+            election.settings_set_timestamper_settings( True, [] )
+            self.pushButtonVotingTimestamperClicked()
+        
+        mb = QtGui.QMessageBox( self )
+        mb.setIcon( QtGui.QMessageBox.Information)
+        mb.setWindowTitle( "Do you want to be a timestamper?" )
+        mb.setTextFormat( Qt.RichText )
+        mb.setText( """By being a timestamper, you contribute to the execution of the election by taking part in the commitment and results phases of the election.<br><br>
+        To be a timestamper, you must agree to possibly spend a very small amount of bitcoin (%.08f BTC / %d satoshi) during the election. This is used to prove that a commitment was created before the deadline and thus ensure that only votes cast before the deadline can be validated as such.<br><br>
+        <b>The election cannot be executed if nobody volunteers as timestamper!</b><br><br>
+        <b>Do you want to be a timestamper?</b>""" % ( BitcoinThread.BTC_UNSPENT_MIN_AVAILABLE, BitcoinThread.SATOSHI_UNSPENT_MIN_AVAILABLE ) )
+        yes_button = mb.addButton( "Yes", QMessageBox.AcceptRole )
+        yes_button.clicked.connect( callback )
+        no_button = mb.addButton( "No", QMessageBox.RejectRole )
+        mb.show()
+        
+    def voting_phase_timer_tick(self):
+        if self.current_election is None:
+            self.voting_phase_timer.stop()
+            return
+        
+        status = self.current_election.get_status()
+        seconds = self.current_election.get_time_for_next_phase( status )
+        if seconds is None:
+            self.voting_phase_timer.stop()
+            return
+        
+        if seconds >= 60:
+            time_left = self.format_seconds_as_time_left( seconds )
+            self.ui.labelVotingPhaseTimer.setText( "Approximately %s left..." % time_left)
+        else:
+            self.ui.labelVotingPhaseTimer.setText( "Very soon... %d" % seconds )
+        
+    def pushButtonVotingDebugClicked(self):
+        if self.current_election is None:
+            return
+        
+        self.voting_debug_menu = QtGui.QMenu(self)
+
+        action = QtGui.QAction( "Broadcast election data", self )
+        action.triggered.connect( self.actionVotingDebugBroadcastElectionData )
+        self.voting_debug_menu.addAction( action )
+        
+        self.voting_debug_menu.addSeparator()
+
+        action = QtGui.QAction( "Trigger posting phase", self )
+        action.triggered.connect( self.actionVotingDebugTriggerPostingPhase )
+        action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_NOT_OPEN_YET )
+        self.voting_debug_menu.addAction( action )
+        action = QtGui.QAction( "Trigger posting phase (broadcast)", self )
+        action.triggered.connect( self.actionVotingDebugTriggerPostingPhaseBroadcast )
+        action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_NOT_OPEN_YET )
+        self.voting_debug_menu.addAction( action )
+        
+        action = QtGui.QAction( "Revoke posting phase", self )
+        action.triggered.connect( self.actionVotingDebugRevokePostingPhase )
+        action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_POSTING )
+        self.voting_debug_menu.addAction( action )
+        
+        self.voting_debug_menu.addSeparator()
+
+        action = QtGui.QAction( "Trigger commitment phase", self )
+        action.triggered.connect( self.actionVotingDebugTriggerCommitmentPhase )
+        action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_POSTING )
+        self.voting_debug_menu.addAction( action )
+        action = QtGui.QAction( "Trigger commitment phase (broadcast)", self )
+        action.triggered.connect( self.actionVotingDebugTriggerCommitmentPhaseBroadcast )
+        action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_POSTING )
+        self.voting_debug_menu.addAction( action )
+        
+        action = QtGui.QAction( "Revoke commitment phase", self )
+        action.triggered.connect( self.actionVotingDebugRevokeCommitmentPhase )
+        action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_COMMITMENT_PHASE )
+        self.voting_debug_menu.addAction( action )
+        
+        self.voting_debug_menu.addSeparator()
+
+        action = QtGui.QAction( "Trigger results phase", self )
+        action.triggered.connect( self.actionVotingDebugTriggerResultsPhase )
+        action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_COMMITMENT_PHASE )
+        self.voting_debug_menu.addAction( action )
+        
+        action = QtGui.QAction( "Trigger results phase (broadcast)", self )
+        action.triggered.connect( self.actionVotingDebugTriggerResultsPhaseBroadcast )
+        action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_COMMITMENT_PHASE )
+        self.voting_debug_menu.addAction( action )
+        
+        action = QtGui.QAction( "Revoke results phase", self )
+        action.triggered.connect( self.actionVotingDebugRevokeResultsPhase )
+        action.setEnabled( self.current_election.get_status() >= ConsensusProtocol.STATUS_RESULTS_PHASE )
+        self.voting_debug_menu.addAction( action )
+        
+        self.voting_debug_menu.addSeparator()
+
+        action = QtGui.QAction( "Clear all messages", self )
+        action.triggered.connect( self.actionVotingDebugClearMessages )
+        self.voting_debug_menu.addAction( action )
+        
+        self.voting_debug_menu.exec_( self.ui.pushButtonVotingDebug.mapToGlobal(QPoint(0,self.ui.pushButtonVotingDebug.size().height())));
+        
+    def actionVotingDebugBroadcastElectionData(self):
+        if self.current_election is None:
+            return
+        self.current_election.broadcast_consensus_metadata()
+        
+    def actionVotingDebugTriggerPostingPhase(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_trigger_posting_phase()
+
+    def actionVotingDebugTriggerPostingPhaseBroadcast(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_trigger_posting_phase(True)
+
+    def actionVotingDebugRevokePostingPhase(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_revoke_posting_phase()
+        self.current_election.data.clear_settings()
+        self.refresh_election( self.current_election )
+        
+    def actionVotingDebugTriggerCommitmentPhase(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_trigger_commitment_phase()
+
+    def actionVotingDebugTriggerCommitmentPhaseBroadcast(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_trigger_commitment_phase(True)
+
+    def actionVotingDebugRevokeCommitmentPhase(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_revoke_commitment_phase()
+        self.refresh_election( self.current_election )
+        
+    def actionVotingDebugTriggerResultsPhase(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_trigger_results_phase()
+        
+    def actionVotingDebugTriggerResultsPhaseBroadcast(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_trigger_results_phase(True)
+        
+    def actionVotingDebugRevokeResultsPhase(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_revoke_results_phase()
+        self.refresh_election( self.current_election )
+        
+    def actionVotingDebugClearMessages(self):
+        if self.current_election is None:
+            return
+        self.current_election.debug_clear_messages()
+        self.current_election.data.clear_settings()
+        self.refresh_election( self.current_election )
+        self.refresh_election_combobox_statuses()
+        
+    def pushButtonVotingTimestamperClicked(self):
+        if self.current_election is None:
+            return
+        self.dialog = NewTimestamperSettingsDialog(self, self.current_election)
+        if self.dialog.exec_():
+            enabled = self.dialog.is_timestamper
+            if enabled:
+                # ( bm_address, private_key, btc_address ) tuples
+                addresses = map( lambda addr: ( addr[1], addr[2], addr[3] ), self.dialog.result )
+            else:
+                addresses = []
+                
+            self.current_election.settings_set_timestamper_settings( enabled, addresses )
+            self.refresh_pushButtonVotingTimestamperText( self.current_election )
+            
+    def refresh_pushButtonVotingTimestamperText(self, election):
+        if election is None or election.data is None:
+            return
+        
+        settings = election.settings_get_timestamper_settings()
+        if settings is None:
+            settings = ( False, [] )
+
+        enabled, addresses = settings
+        
+        if not enabled:
+            text = "Timestamper disabled"
+        elif len( addresses ) == 1:
+            text = "Timestamper enabled"
+        else:
+            text = "Timestamper enabled (%d)" % len( addresses ) 
+        self.ui.pushButtonVotingTimestamper.setText( text )
+
+    def pushButtonVotingDetailsClicked(self):
+        if self.current_election is None:
+            return
+        self.dialog = NewElectionDetailsDialog(self, self.current_election)
+        self.dialog.exec_()
+        
+
+    def init_voting_options_button(self):
+        self.ui.pushButtonVotingOptions.clicked.connect( self.pushButtonVotingOptionsClicked )
+        self.voting_options_menu = QtGui.QMenu(self)
+
+        action = QtGui.QAction( "Export election to file", self )
+        action.triggered.connect( self.actionVotingExportTriggered )
+        self.voting_options_menu.addAction( action )
+        
+        self.voting_options_menu.addSeparator()
+        action = QtGui.QAction( "Remove election", self )
+        action.triggered.connect( self.actionVotingRemoveTriggered )
+        self.voting_options_menu.addAction( action )
+        
+    def pushButtonVotingOptionsClicked(self):
+        self.voting_options_menu.exec_( self.ui.pushButtonVotingOptions.mapToGlobal(QPoint(0,self.ui.pushButtonVotingOptions.size().height())));
+        
+    def actionVotingExportTriggered(self):
+        if self.current_election is None:
+            return
+        
+        if not self.current_election.data.has_all_public_keys():
+            QMessageBox.about(self, _translate("MainWindow", "Not all public keys available"), _translate(
+                        "MainWindow", "We don't have all the public keys for this election. Please wait until they have arrived."))
+            return
+        
+        filename = QtGui.QFileDialog.getSaveFileName(self, _translate("MainWindow", "Export election"),
+                    shared.appdata, _translate("MainWindow", "Election file (*.vote)") )
+        if filename == '':
+            return
+        
+        self.current_election.saveToFile( filename )
+
+    def actionVotingRemoveTriggered(self):
+        if self.current_election is None:
+            return
+        
+        result = QtGui.QMessageBox.question(self, _translate("MainWindow", "Remove election"),
+            _translate("MainWindow", "Remove election %s?" % self.current_election.data.question), QtGui.QMessageBox.Ok | 
+            QtGui.QMessageBox.Cancel, QtGui.QMessageBox.Cancel)
+ 
+        if result == QtGui.QMessageBox.Ok:
+            self.current_election.delete()
+            self.refresh_elections()
+
+    
+    def refresh_votes_table(self, election):
+        """
+        Show individual votes
+        """
+        self.ui.tableWidgetVotingVotes.setRowCount( 0 )
+        if election is None or election.data is None:
+            return
+        
+        answers_dict = election.data.get_answers_dict()
+        for vote in election.data.get_individual_votes():
+            self.ui.tableWidgetVotingVotes.insertRow( 0 )
+            time, tag, answer, votes_with_tag = vote
+            
+            color = Qt.black if votes_with_tag == 1 else Qt.gray
+            
+            # Tag
+            item = QTableWidgetItem( str( tag.encode_binary().encode('hex')[:32] ) )
+            item.setIcon(avatarize(tag))
+            item.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            item.setForeground( color )
+            self.ui.tableWidgetVotingVotes.setItem( 0, 0, item )
+            
+            # Time
+            item = QTableWidgetItem( format_time( int( time ) ) )
+            item.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            item.setForeground( color )
+            self.ui.tableWidgetVotingVotes.setItem( 0, 1, item )
+            
+            # Vote
+            item = QTableWidgetItem( answers_dict[ answer ] )
+            item.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            item.setForeground( color )
+            self.ui.tableWidgetVotingVotes.setItem( 0, 2, item )
+            
+            
+    def refresh_result_table(self, election):
+        """
+        Show our own current results
+        """
+
+        self.ui.tableWidgetVotingResults.setRowCount( 0 )
+        if election is None or election.data is None:
+            return
+        
+        for _, answer, votes in election.data.get_answers_and_votes():
+            self.ui.tableWidgetVotingResults.insertRow(0)
+            
+            newItem = QTableWidgetItem( answer )
+            newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            self.ui.tableWidgetVotingResults.setItem(0, 0, newItem)
+            
+            newItem = QTableWidgetItem( str( votes ) )
+            newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            newItem.setTextAlignment( Qt.AlignRight | Qt.AlignVCenter )
+            self.ui.tableWidgetVotingResults.setItem(0, 1, newItem)
+            
+            
+    def refresh_results_widget(self, election):
+        if election is None or election.get_status() != ConsensusProtocol.STATUS_RESULTS_PHASE:
+            self.ui.widgetVotingAllResults.hide()
+            return
+        
+        self.ui.widgetVotingAllResults.show()
+        self.refresh_all_voting_results(election)
+        
+    def refresh_all_voting_results(self, election):
+        selected_result = self.current_election_result
+        self.ui.tableWidgetVotingAllResults.setRowCount( 0 )
+
+        # Find all results messages
+        result_messages = election.filter_messages( message_type=ConsensusProtocol.MESSAGE_RESULTS )
+        # Transform into ( message_hash, ( list_hash, results_json ) ) tuples
+        self.election_results = map( lambda msg: ( msg[3], ConsensusProtocol.unpack_results_message( msg[2] ) ), result_messages )
+        
+        for message_hash, _ in self.election_results:
+            self.ui.tableWidgetVotingAllResults.insertRow(0)
+            
+            newItem = QTableWidgetItem( str( message_hash.encode('hex') ) )
+            newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            self.ui.tableWidgetVotingAllResults.setItem(0, 0, newItem)
+            
+        if selected_result in self.election_results:
+            self.ui.tableWidgetVotingAllResults.setCurrentRow( self.election_results.index( selected_result ) )
+            
+    def tableWidgetVotingAllResultsItemChanged(self):
+        self.ui.tableWidgetVotingResultDetails.setRowCount( 0 )     
+
+        index = self.ui.tableWidgetVotingAllResults.currentRow()
+        if index < 0 or index >= len( self.election_results ) :
+            return
+        
+        _, (_, results_json ) = self.current_election_result = self.election_results[ index ]
+
+        import json
+        results = json.loads( results_json )
+        
+        self.ui.tableWidgetVotingResultDetails.setRowCount( 0 )
+        for _, answer, votes in results:
+            self.ui.tableWidgetVotingResultDetails.insertRow(0)
+            
+            newItem = QTableWidgetItem( answer )
+            newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            self.ui.tableWidgetVotingResultDetails.setItem(0, 0, newItem)
+            
+            newItem = QTableWidgetItem( str( votes ) )
+            newItem.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            newItem.setTextAlignment( Qt.AlignRight | Qt.AlignVCenter )
+            self.ui.tableWidgetVotingResultDetails.setItem(0, 1, newItem)
+
+        
+    def refresh_vote_actions(self, election):
+        """
+        Show voting panel
+        """
+        if election is None or election.get_status() != ConsensusProtocol.STATUS_POSTING:
+            self.current_election_voter_address = None
+            self.current_election_answer = None
+            self.ui.widgetVotingActions.hide()
+            return
+        
+        self.voting_addresses = election.data.get_my_voter_addresses()
+        
+        # Check if user has any addresses to vote from, and if we are in posting phase
+        if len( self.voting_addresses ) == 0 or election.get_status() != ConsensusProtocol.STATUS_POSTING:
+            self.ui.widgetVotingActions.hide()
+            return
+        
+        self.ui.widgetVotingActions.show()
+        
+        selected_address = self.current_election_voter_address
+        
+        # Single address, just show it on a label
+        if len( self.voting_addresses ) == 1:
+            address = self.voting_addresses[0]
+            self.ui.comboBoxVotingMultipleAddresses.hide()
+            self.ui.labelVotingVoteSingleAddress.show()
+            self.ui.labelVotingVoteSingleAddress.setText( address )
+            self.current_election_voter_address = address
+        
+        # Multiple addresses, show the choices in a combobox
+        else:
+            self.ui.labelVotingVoteSingleAddress.hide()
+            self.ui.comboBoxVotingMultipleAddresses.show()
+            self.ui.comboBoxVotingMultipleAddresses.clear()
+            for address in self.voting_addresses:
+                self.ui.comboBoxVotingMultipleAddresses.addItem( address )
+            if selected_address in self.voting_addresses:
+                self.ui.comboBoxVotingMultipleAddresses.setCurrentIndex( self.voting_addresses.index( selected_address ) )
+                
+                
+        # Show vote possibilities
+        selected_answer = self.current_election_answer
+        
+        self.ui.comboBoxVotingVote.clear()
+        self.voting_vote_answers = election.data.get_answers_dict().items()
+        for answer_no, answer in self.voting_vote_answers:
+            self.ui.comboBoxVotingVote.addItem( answer, answer_no )
+        if selected_answer is not None:
+            if selected_answer in self.voting_vote_answers:
+                self.ui.comboBoxVotingVote.setCurrentIndex( self.voting_vote_answers.index( selected_answer ) )
+        
+    def comboBoxVotingMultipleAddressesIndexChanged(self, index):
+        self.current_election_voter_address = self.voting_addresses[index] if index >= 0 else None
+        
+    def comboBoxVotingVoteIndexChanged(self, index):
+        self.current_election_answer = self.voting_vote_answers[index] if index >= 0 else None
+        
+    def pushButtonVotingCastVoteClicked(self):
+        if self.current_election_voter_address is None or self.current_election_answer is None:
+            return
+        
+        answer_no = self.current_election_answer[0]
+        
+        cp = self.current_election
+        cp.data.cast_vote( self.current_election_voter_address, answer_no )
+        
+        # Casting a vote removes the address from the list of addresses,
+        # so we should update the voting actions
+        self.refresh_vote_actions( self.current_election )
+
+
+
 
 
 class helpDialog(QtGui.QDialog):
@@ -3778,6 +4427,508 @@ class iconGlossaryDialog(QtGui.QDialog):
         QtGui.QWidget.resize(self, QtGui.QWidget.sizeHint(self))
 
 
+class NewCreateElectionDialog(QtGui.QDialog):
+    
+    BLOCKCHAINS = [ ConsensusProtocol.BLOCKCHAIN_BITCOIN,
+                    ConsensusProtocol.BLOCKCHAIN_BITCOIN_TESTNET ]
+    
+    def __init__(self, parent):
+        QtGui.QWidget.__init__(self, parent, Qt.WindowTitleHint | Qt.WindowSystemMenuHint)
+        self.ui = Ui_CreateElectionDialog()
+        self.ui.setupUi(self)
+        self.setWindowTitle( "Create election" )
+        self.parent = parent
+        self.question = "Best programming language?"
+        self.answers = ["Java", "Python", "Ruby", "C#", "Haskell", "ML", "Erlang", "C"]
+        self.voters = []
+        self.blockchain = ConsensusProtocol.BLOCKCHAIN_BITCOIN
+        self.start_time = 0
+        self.deadline = 0
+        self.commitment_phase_deadline = 0
+        self.result = None
+        self.ui.lineEditQuestion.textChanged.connect( self.question_changed )
+        self.ui.pushButtonAddAnswer.clicked.connect( self.add_answer )
+        self.ui.pushButtonAddVoter.clicked.connect( self.add_voter )
+        self.init_answer_popup_menu()
+        self.init_voter_popup_menu()
+        
+        self.ui.lineEditQuestion.setText( self.question )
+        self.refresh_answers()
+        self.refresh_blockchain()
+        
+        # self.popMenuElections.exec_( self.ui.tableWidgetElections.mapToGlobal(point))
+
+        
+        self.ui.dateTimeStart.setDate( QtCore.QDate.currentDate() )
+        self.ui.dateTimeStart.setTime( QtCore.QTime(0,0,0) )
+        self.ui.dateTimeStop.setDate( QtCore.QDate.currentDate().addDays(1) )
+        self.ui.dateTimeStop.setTime( QtCore.QTime(0,0,0) )
+        self.ui.dateTimeCommitmentPhaseDeadline.setDate( QtCore.QDate.currentDate().addDays(1) )
+        self.ui.dateTimeCommitmentPhaseDeadline.setTime( QtCore.QTime(6,0,0) )
+
+    def init_answer_popup_menu(self):
+        self.ui.electionAnswerContextMenuToolbar = QtGui.QToolBar()
+        
+        self.actionAnswerRemove = self.ui.electionAnswerContextMenuToolbar.addAction(
+            _translate( "MainWindow", "Remove" ), self.on_action_answerRemove)
+        
+        self.ui.listWidgetAnswers.setContextMenuPolicy( QtCore.Qt.CustomContextMenu )
+        self.ui.listWidgetAnswers.customContextMenuRequested.connect( lambda point: self.popMenuElectionAnswers.exec_(QCursor.pos()) )
+
+        self.popMenuElectionAnswers = QtGui.QMenu(self)
+        self.popMenuElectionAnswers.addAction(self.actionAnswerRemove)
+
+    def init_voter_popup_menu(self):
+        self.ui.electionVoterContextMenuToolbar = QtGui.QToolBar()
+        
+        self.actionVoterRemove = self.ui.electionVoterContextMenuToolbar.addAction(
+            _translate( "MainWindow", "Remove" ), self.on_action_voterRemove)
+        
+        self.ui.listWidgetVoters.setContextMenuPolicy( QtCore.Qt.CustomContextMenu )
+        self.ui.listWidgetVoters.customContextMenuRequested.connect( lambda point: self.popMenuElectionVoters.exec_(QCursor.pos()) )
+        
+        self.popMenuElectionVoters = QtGui.QMenu(self)
+        self.popMenuElectionVoters.addAction(self.actionVoterRemove)
+
+    def on_action_answerRemove(self):
+        currentRow = self.ui.listWidgetAnswers.currentRow()
+        if currentRow >= 0:
+            self.answers.remove( self.answers[currentRow] )
+            self.refresh_answers()
+        
+    def on_action_voterRemove(self):
+        currentRow = self.ui.listWidgetVoters.currentRow()
+        if currentRow >= 0:
+            self.voters.remove( self.voters[currentRow] )
+            self.refresh_voters()
+        
+    def accept(self):
+        self.blockchain = NewCreateElectionDialog.BLOCKCHAINS[ self.ui.comboBoxBlockchain.currentIndex() ]
+        
+        # We want the timestamps in seconds, so we divide by 1000
+        self.start_time = int( self.ui.dateTimeStart.dateTime().toMSecsSinceEpoch() / 1000 )
+        self.deadline = int( self.ui.dateTimeStop.dateTime().toMSecsSinceEpoch() / 1000 )
+        self.commitment_phase_deadline = int( self.ui.dateTimeCommitmentPhaseDeadline.dateTime().toMSecsSinceEpoch() / 1000 )
+        
+        if len( self.question ) < 1:
+            QMessageBox.about(self, _translate("MainWindow", "No question"), _translate(
+                        "MainWindow", "You need to enter a question."))
+        elif len( self.answers ) <= 1:
+            QMessageBox.about(self, _translate("MainWindow", "Not enough answers"), _translate(
+                        "MainWindow", "You need to enter at least two answers."))
+        elif len( self.voters ) <= 2:
+            QMessageBox.about(self, _translate("MainWindow", "Not enough voters"), _translate(
+                        "MainWindow", "You need to enter at least three voter addresses."))
+        elif self.start_time >= self.deadline:
+            QMessageBox.about(self, _translate("MainWindow", "Wrong deadline"), _translate(
+                        "MainWindow", "Election deadline must be after election start."))
+        elif self.deadline >= self.commitment_phase_deadline:
+            QMessageBox.about(self, _translate("MainWindow", "Wrong deadline"), _translate(
+                        "MainWindow", "Commitment phase deadline must be after election deadline."))
+        else:
+            # First convert from QStrings to normal Python strings
+            question = str( self.question )
+            answers = map( lambda s: str( s ), self.answers )
+            voters = map( lambda s: str( s ), self.voters )
+            # Time should be changed to use the blockchain 
+            time_data = ConsensusTimeData( self.start_time, self.deadline, self.commitment_phase_deadline )
+            data = VotingData( self.blockchain, time_data, question, answers, voters)
+            time_data.data = data
+            ConsensusProtocol.create( data )
+            QtGui.QDialog.accept(self)
+        
+    def refresh_answers(self):
+        self.ui.listWidgetAnswers.clear()
+        for i in range( len( self.answers ) ):
+            self.ui.listWidgetAnswers.addItem( "%d. %s" % ( i+1, self.answers[i] ) )
+            
+    def refresh_voters(self):
+        self.ui.listWidgetVoters.clear()
+        for voter in self.voters:
+            item = QListWidgetItem()
+            item.setText( voter )
+            if not helper_keys.has_pubkey_for(voter, decodeAddress( voter ) ):
+                item.setForeground( Qt.gray )
+            self.ui.listWidgetVoters.addItem( item )
+            
+    def refresh_blockchain(self):
+        self.ui.comboBoxBlockchain.setCurrentIndex( NewCreateElectionDialog.BLOCKCHAINS.index( self.blockchain ) )
+            
+    def question_changed(self):
+        self.question = self.ui.lineEditQuestion.text()        
+    
+    def add_answer(self):
+        text, ok = QtGui.QInputDialog.getText(self, 'Add answer', 'Enter answer:')
+        if ok and text.trimmed() != "":
+            self.answers.append( text.trimmed() )
+            self.refresh_answers()
+            
+    def add_voter(self):
+        text, ok = QtGui.QInputDialog.getText(self, 'Add voter', 'Enter one or more (comma-separated) Bitmessage addresses:')
+        if ok:
+            changed_anything = False
+            invalid_addresses = []
+            addresses = map( lambda a: a.strip(), str( text ).split( "," ) )
+            for address in addresses:
+                if address != '' and not address in self.voters:
+                    status, addressVersionNumber, streamNumber, ripe = decodeAddress( address )
+                    if status == "success":
+                        changed_anything = True
+                        self.voters.append( address )
+                    else:
+                        invalid_addresses.append( address )
+            
+            if len( invalid_addresses ) > 0:
+                QMessageBox.about( self, _translate("MainWindow", "%1 invalid addresses").arg( len(invalid_addresses) ),
+                                   _translate("MainWindow", "The following addresses were not valid:\n%1").arg( "\n".join( invalid_addresses ) ) )
+                
+            if changed_anything:
+                self.voters.sort()
+                self.refresh_voters()
+
+class NewElectionDetailsDialog(QtGui.QDialog):
+    
+    def __init__(self, parent, election):
+        QtGui.QWidget.__init__(self, parent, Qt.WindowTitleHint | Qt.WindowSystemMenuHint )
+        self.ui = Ui_ElectionDetailsDialog()
+        self.ui.setupUi(self)
+        self.setWindowTitle( "Election details" )
+        self.parent = parent
+        self.election = election
+        
+        QtCore.QObject.connect(parent.UISignalThread, QtCore.SIGNAL(
+            "refresh_election_ui(PyQt_PyObject)"), self.refresh_details)
+        
+        self.refresh_details( election )
+        
+    def refresh_details(self, election):
+        status = election.get_status()
+        
+        
+        self.ui.labelQuestion.setText( election.data.question )
+        self.ui.labelStatus.setText( get_election_status_text( election ) )
+        
+        
+        self.ui.labelHash.setText( election.hash )
+        self.ui.labelChanAddress.setText( election.chan_address )
+        
+        
+        self.ui.labelStartTime.setText( format_time( election.data.time_data.start * 1000 ) )
+        self.ui.labelDeadline.setText( format_time( election.data.time_data.post_deadline * 1000 ) )
+        self.ui.labelCommitmentPhaseDeadline.setText( format_time( election.data.time_data.commitment_phase_deadline * 1000 ) )
+        
+        if election.data.blockchain in ConsensusProtocol.BLOCKCHAIN_NAMES:
+            self.ui.labelBlockchain.setText( ConsensusProtocol.BLOCKCHAIN_NAMES[election.data.blockchain] )
+        else:
+            self.ui.labelBlockchain.setText( "N/A" )
+        self.ui.labelAmountAddresses.setText( str( len( election.data.addresses ) ) )
+        self.ui.labelAmountPublicKeys.setText( "%d/%d" % ( election.data.get_amount_public_keys(), len( election.data.addresses ) ) )
+        
+        
+        if status >= ConsensusProtocol.STATUS_POSTING:
+            self.ui.labelAmountVotes.setText( str( len( election.filter_messages( ConsensusProtocol.MESSAGE_MESSAGE, ConsensusProtocol.MESSAGE_STATE_ACCEPTED ) ) ) )
+        else:
+            self.ui.labelAmountVotes.setText( "N/A" )
+            
+        commits_processed = len( election.filter_messages(ConsensusProtocol.MESSAGE_COMMITMENT, ConsensusProtocol.MESSAGE_STATE_PROCESSED ) )
+        total_commits = len( election.filter_messages(ConsensusProtocol.MESSAGE_COMMITMENT ) )
+        amount_commits_processed = "%d/%d" % ( commits_processed, total_commits )
+        self.ui.labelAmountCommitments.setText( amount_commits_processed )
+        self.ui.labelAmountResults.setText( str( len( election.filter_messages( ConsensusProtocol.MESSAGE_RESULTS ) ) ) )
+            
+        if status >= ConsensusProtocol.STATUS_COMMITMENT_PHASE:
+            self.ui.labelAmountVotesTooLate.setText( str( len( election.filter_messages( ConsensusProtocol.MESSAGE_MESSAGE, ConsensusProtocol.MESSAGE_STATE_RECEIVED_AFTER_DEADLINE ) ) ) )
+        else:
+            self.ui.labelAmountVotesTooLate.setText( "N/A" )
+            
+        if status >= ConsensusProtocol.STATUS_RESULTS_PHASE:
+            self.ui.labelAmountMissingValidVotes.setText( str( len( election.settings_get_missing_accepted_message_hashes() ) ) )
+            self.ui.labelAmountVotesValidatedFromCommitments.setText( str( election.settings_get_messages_accepted_by_commitments() ) )
+            self.ui.labelAmountInvalidCommitments.setText( str( len( election.filter_messages(ConsensusProtocol.MESSAGE_COMMITMENT, ConsensusProtocol.MESSAGE_STATE_INVALID_COMMITMENT) ) ) )
+        else:
+            self.ui.labelAmountMissingValidVotes.setText( "N/A" )
+            self.ui.labelAmountVotesValidatedFromCommitments.setText( "N/A" )
+            self.ui.labelAmountInvalidCommitments.setText( "N/A" )
+            
+            
+        """
+        Address list
+        """
+        self.ui.listWidgetAddresses.clear()
+        for address in election.data.addresses:
+            self.ui.listWidgetAddresses.addItem( QtGui.QListWidgetItem( avatarize( address ), address ) )
+
+class NewTimestamperSettingsDialog(QtGui.QDialog):
+    def __init__(self, parent, election, selected_private_keys=[]):
+        QtGui.QWidget.__init__(self, parent, Qt.WindowTitleHint | Qt.WindowSystemMenuHint)
+        self.ui = Ui_TimestamperSettingsDialog()
+        self.ui.setupUi(self)
+        self.setWindowTitle( "Timestamper settings" )
+        self.parent = parent
+        self.election = election
+        self.testnet = election.data.is_testnet_blockchain()
+        self.is_timestamper, addresses_initially_selected = election.settings_get_timestamper_settings()
+        
+        # List of [ type, bm_address, private_key, btc_address, balance ]-sublists
+        # type is either "bm-derived" or "imported"
+        self.addresses = []
+        self.addresses_selected = []
+        self.initialize_addresses( addresses_initially_selected )
+        self.result = None
+        self.ui.checkBoxTimestamper.stateChanged.connect( self.checkBoxTimestamperStateChanged )
+        self.ui.pushButtonImportBitcoinAddress.clicked.connect( self.pushButtonImportBitcoinAddressClicked )
+        self.ui.pushButtonRefreshBalances.clicked.connect( self.pushButtonRefreshBalancesClicked )
+        self.ui.tableWidgetAddresses.itemSelectionChanged.connect( self.tableWidgetAddressesItemSelectionChanged )
+        self.init_table_popup()
+        self.refresh_dialog_state()
+        self.refresh_address_list()
+        self.refresh_balances()
+        
+        QtCore.QObject.connect(parent.UISignalThread, QtCore.SIGNAL(
+            "refreshBitcoinAddresses()"), self.refresh_address_list)
+        
+    def initialize_addresses(self, addresses):
+        # Expecting addresses to be a list of ( bm_address=None, private_key, btc_address )-tuples
+        bm_addresses = []
+        for bm_address, private_key, btc_address in addresses:
+            type = "imported" if bm_address == None else "bm-derived"
+            addr_tuple = [ type, bm_address, private_key, btc_address, -1.0 ] 
+            self.addresses.append( addr_tuple )
+            self.addresses_selected.append( addr_tuple )
+            if bm_address is not None:
+                bm_addresses.append( bm_address )
+                
+        # Filter out addresses already added above. 
+        derived_addresses = filter( lambda addr: addr[1] not in bm_addresses, self.get_bm_derived_addresses() )
+        self.addresses.extend( derived_addresses )
+         
+        
+    def checkBoxTimestamperStateChanged(self, state):
+        self.is_timestamper = state == Qt.Checked
+        self.refresh_dialog_state()
+    
+    def refresh_dialog_state(self):
+        if self.ui.checkBoxTimestamper.isChecked() != self.is_timestamper:
+            self.ui.checkBoxTimestamper.setChecked( self.is_timestamper )
+        self.ui.pushButtonImportBitcoinAddress.setEnabled( self.is_timestamper )
+        self.ui.pushButtonRefreshBalances.setEnabled( self.is_timestamper )
+        self.ui.tableWidgetAddresses.setEnabled( self.is_timestamper )
+        self.refresh_ok_button_state()
+        
+    def refresh_ok_button_state(self):
+        if self.is_timestamper:
+            enabled = len( self.addresses_selected ) > 0 or ConsensusProtocol.DISABLE_COMMITMENTS_ON_BLOCKCHAIN
+        else:
+            enabled = True
+        self.ui.buttonBox.button( QDialogButtonBox.Ok ).setEnabled( enabled )
+        
+    def pushButtonImportBitcoinAddressClicked(self):
+        text, ok = QtGui.QInputDialog.getText(self, 'Import bitcoin address', 'Enter a private key either hex-encoded (64 chars) or as Wallet Import Format (WIF)')
+        text = text.trimmed()
+        if ok and text != "":
+            if len( text ) == 64:
+                # Private key in hex-encoding
+                private_key = text.decode('hex')
+                
+            elif len( text ) >= 50 and len( text ) < 55:
+                # Wallet Import format
+                # Two WIF examples had 51 and 52 bytes length, so [50,55] is just a guess
+                private_key = shared.decodeWalletImportFormat( text )
+                if private_key is None or private_key == "":
+                    QtGui.QMessageBox.information( self, "Invalid key", "Couldn't import WIF" )
+                    return
+                private_key = private_key
+            else:
+                QtGui.QMessageBox.information( self, "Invalid key", "Couldn't decode private key" )
+                return
+            
+            public_key = arithmetic.privtopub( private_key.encode('hex') ).decode('hex')
+            btc_address = BitcoinThread.get_address( self.testnet, public_key )
+            
+            if private_key in map( lambda addr: addr[2], self.addresses ):
+                QtGui.QMessageBox.information( self, "Address already exists", "The address %s is already in the list" % btc_address )
+                return
+                
+            self.addresses.append( ["imported", None, private_key, btc_address, -1.0 ] )
+                
+            self.refresh_balances()
+            self.refresh_address_list()
+        
+        pass
+        
+    def pushButtonRefreshBalancesClicked(self):
+        for i in range( len( self.addresses ) ):
+            self.addresses[i][4] = -1.0
+        self.refresh_balances()
+        self.refresh_address_list()
+    
+    def get_bm_derived_addresses(self):
+        result = []
+        for address in helper_keys.getMyAddresses():
+            # [ type, bm_address, private_key, btc_address, balance ]
+            privSigningKey, pubSigningKey = helper_keys.getPrivateSigningKey( address ), helper_keys.getPublicSigningKey( address )
+            bitcoin_address = BitcoinThread.get_corresponding_address( self.testnet, None, pubSigningKey )
+            result.append( [ "bm-derived", address, privSigningKey, bitcoin_address, -1.0 ] )
+            
+        return result
+    
+    def refresh_address_list(self):
+        selected_addresses = self.addresses_selected
+        selected_btc_addresses = map( lambda a: a[3], selected_addresses )
+        selected_rows = [i for i in range( len( self.addresses ) ) if self.addresses[i][3] in selected_btc_addresses]
+        
+        self.ui.tableWidgetAddresses.setRowCount( 0 )
+        for _, bm_address, _, btc_address, balance in reversed( self.addresses ):
+
+            self.ui.tableWidgetAddresses.insertRow( 0 )
+            
+            color = Qt.black if balance >= BitcoinThread.BTC_UNSPENT_MIN_AVAILABLE else Qt.gray
+            flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+            
+            item = QTableWidgetItem( bm_address if bm_address is not None else "(Imported address)" )
+            if bm_address is not None:
+                item.setIcon(avatarize( bm_address ))
+            item.setFlags( flags )
+            item.setForeground( color )
+            self.ui.tableWidgetAddresses.setItem( 0, 0, item )
+            
+            item = QTableWidgetItem( btc_address )
+            item.setFlags( flags )
+            item.setForeground( color )
+            self.ui.tableWidgetAddresses.setItem( 0, 1, item )
+            
+            balance_str = ( "%.8f BTC" % balance ) if balance >= 0 else "Refreshing..."
+            item = QTableWidgetItem( balance_str )
+            item.setFlags( flags )
+            item.setForeground( color )
+            self.ui.tableWidgetAddresses.setItem( 0, 2, item )
+           
+        # We'll have to temporarily set the selection mode to MultiSelection
+        # to programmatically select multiple rows (without using the QItemSelectionModel)
+        self.ui.tableWidgetAddresses.setSelectionMode( QAbstractItemView.MultiSelection )
+        for row in selected_rows:
+            self.ui.tableWidgetAddresses.selectRow( row )
+        self.ui.tableWidgetAddresses.setSelectionMode( QAbstractItemView.ExtendedSelection )
+        self.addresses_selected = selected_addresses
+
+    def refresh_ui(self):
+        self.refresh_address_list()
+            
+    def init_table_popup(self):
+        self.ui.tableWidgetAddresses.setContextMenuPolicy( QtCore.Qt.CustomContextMenu )
+        self.ui.tableWidgetAddresses.customContextMenuRequested.connect( self.tableWidgetAddressContentMenuRequested )
+
+    def get_selected_address(self):
+        row = self.ui.tableWidgetAddresses.currentRow()
+        if row < 0 or row >= len( self.addresses ):
+            return None
+        btc_address = self.ui.tableWidgetAddresses.item( row, 1 ).text()
+        btc_addresses = map( lambda a: a[3], self.addresses )
+        if btc_address in btc_addresses:
+            return self.addresses[ btc_addresses.index( btc_address ) ]
+        else:
+            return None
+        
+    def tableWidgetAddressContentMenuRequested(self, point):
+        address = self.get_selected_address()
+        if address is None:
+            return
+
+        menu = QtGui.QMenu(self)
+
+        action = QtGui.QAction( "Copy bitcoin address to clipboard", self )
+        action.triggered.connect( self.actionCopyAddressToClipboard )
+        menu.addAction( action )
+         
+        menu.addSeparator()
+        
+        action = QtGui.QAction( "Remove address", self )
+        action.triggered.connect( self.actionRemoveAddress )
+        action.setEnabled( type == 'imported' )
+        menu.addAction( action )
+        
+        menu.exec_( self.ui.tableWidgetAddresses.mapToGlobal( point ) );
+    
+    def actionCopyAddressToClipboard(self):
+        address = self.get_selected_address()
+        if address is None:
+            return
+        
+        _, _, _, btc_address, _ = address
+        
+        cb = QtGui.QApplication.clipboard()
+        cb.clear(mode=cb.Clipboard )
+        cb.setText(btc_address, mode=cb.Clipboard)
+        
+    def actionRemoveAddress(self):
+        address = self.get_selected_address()
+        if address is None:
+            return
+        
+        self.addresses.remove( address )
+        self.refresh_address_list()
+        
+    def unspent_transactions_received(self, result):
+        if result is None:
+            return
+        for obj in result:
+            
+            balance_btc = 0.0
+            
+            # Calculate balance
+            for unspent in obj["unspent"]:
+                balance_btc += float( unspent["amount"] )
+            
+            # Find address
+            for i in range( len( self.addresses ) ):
+                _, _, _, btc_address, _ = self.addresses[i]
+                if btc_address == obj["address"]:
+                    self.addresses[i][4] = balance_btc
+                    
+        shared.UISignalQueue.put( ( "refreshBitcoinAddresses", [] ) )
+            
+    def refresh_balances(self):
+        addresses = map( lambda addr: addr[3], self.addresses )
+        BitcoinThread.enqueue( self, "getUnspentTransactions", ( self.testnet, addresses ), self.unspent_transactions_received )
+        
+    def tableWidgetAddressesItemSelectionChanged(self):
+        selection_model = self.ui.tableWidgetAddresses.selectionModel()
+        selected_rows = selection_model.selectedRows()
+        self.addresses_selected = [ self.addresses[i.row()] for i in selected_rows ]
+        self.refresh_ok_button_state()
+    
+    def accept(self):
+        if not ConsensusProtocol.DISABLE_COMMITMENTS_ON_BLOCKCHAIN:
+            empty_addresses = [addr for addr in self.addresses_selected if addr[4] < BitcoinThread.BTC_UNSPENT_MIN_AVAILABLE]
+            if len( empty_addresses ) > 0:
+                QtGui.QMessageBox.information( self, "Empty address(es) selected", "You cannot choose addresses with balance lower than %.8f BTC\nThe following addresses don't have enough in their balance:\n%s" % ( BitcoinThread.BTC_UNSPENT_MIN_AVAILABLE, ", ".join( map( lambda addr: addr[3], empty_addresses ) ) ) )
+                for addr in empty_addresses:
+                    self.addresses_selected.remove( addr )
+                self.refresh_address_list()
+                return False
+            
+        self.result = [addr for addr in self.addresses_selected if addr[4] >= BitcoinThread.BTC_UNSPENT_MIN_AVAILABLE]
+
+        QtGui.QDialog.accept( self )
+
+
+def format_time( t ):
+    return unicode( strftime( shared.config.get('bitmessagesettings', 'timeformat'), localtime( t/1000 ) ),'utf-8')
+def get_election_status_text(election):
+    status = election.get_status()
+    
+    if status == ConsensusProtocol.STATUS_UNKNOWN:
+        return "Waiting for metadata"
+    if status == ConsensusProtocol.STATUS_NOT_OPEN_YET:
+        return "Not yet open"
+    elif status == ConsensusProtocol.STATUS_POSTING:
+        return "Election is open"
+    elif status == ConsensusProtocol.STATUS_COMMITMENT_PHASE:
+        return "Commitment phase"
+    elif status == ConsensusProtocol.STATUS_RESULTS_PHASE:
+        return "Election over"
+            
+
 # In order for the time columns on the Inbox and Sent tabs to be sorted
 # correctly (rather than alphabetically), we need to overload the <
 # operator and use this class instead of QTableWidgetItem.
@@ -3843,6 +4994,14 @@ class UISignaler(QThread):
             elif command == 'alert':
                 title, text, exitAfterUserClicksOk = data
                 self.emit(SIGNAL("displayAlert(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), title, text, exitAfterUserClicksOk)
+            elif command == 'refresh_election_ui':
+                election, = data
+                self.emit(SIGNAL("refresh_election_ui(PyQt_PyObject)"), election )
+            elif command == 'election_initialized':
+                election, = data
+                self.emit(SIGNAL("election_initialized(PyQt_PyObject)"), election )
+            elif command == "refreshBitcoinAddresses":
+                self.emit(SIGNAL("refreshBitcoinAddresses()"))
             else:
                 sys.stderr.write(
                     'Command sent to UISignaler not recognized: %s\n' % command)

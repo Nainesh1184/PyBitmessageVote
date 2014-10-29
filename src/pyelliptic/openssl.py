@@ -5,6 +5,12 @@
 #  See LICENSE for details.
 #
 #  Software slightly changed by Jonathan Warren <bitmessage at-symbol jonwarren.org>
+#
+#  Additional changes by Jesper Borgstrup <jesper at-symbol borgstrup.dk>:
+#  * Added EC_GROUP_get0_generator, EC_GROUP_get_order,
+#          EC_GROUP_new_by_curve_name, EC_POINT_add, 
+#          i2d_ECPKParameters, EC_POINT_set_affine_coordinates_GF2m,
+#          EC_KEY_new
 
 import sys
 import ctypes
@@ -67,9 +73,26 @@ class _OpenSSL:
         self.BN_bin2bn.argtypes = [ctypes.c_void_p, ctypes.c_int,
                                    ctypes.c_void_p]
 
+        self.EC_GROUP_get0_generator = self._lib.EC_GROUP_get0_generator
+        self.EC_GROUP_get0_generator.restype = ctypes.c_int
+        self.EC_GROUP_get0_generator.argtypes = [ctypes.c_void_p]
+
+        self.EC_GROUP_get_order = self._lib.EC_GROUP_get_order
+        self.EC_GROUP_get_order.restype = ctypes.c_int
+        self.EC_GROUP_get_order.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+                                            ctypes.c_void_p]
+
+        self.EC_GROUP_new_by_curve_name = self._lib.EC_GROUP_new_by_curve_name
+        self.EC_GROUP_new_by_curve_name.restype = ctypes.c_void_p
+        self.EC_GROUP_new_by_curve_name.argtypes = [ctypes.c_int]
+
         self.EC_KEY_free = self._lib.EC_KEY_free
         self.EC_KEY_free.restype = None
         self.EC_KEY_free.argtypes = [ctypes.c_void_p]
+
+        self.EC_KEY_new = self._lib.EC_KEY_new
+        self.EC_KEY_new.restype = ctypes.c_void_p
+        self.EC_KEY_new.argtypes = []
 
         self.EC_KEY_new_by_curve_name = self._lib.EC_KEY_new_by_curve_name
         self.EC_KEY_new_by_curve_name.restype = ctypes.c_void_p
@@ -117,6 +140,10 @@ class _OpenSSL:
         self.EC_POINT_set_affine_coordinates_GFp.restype = ctypes.c_int
         self.EC_POINT_set_affine_coordinates_GFp.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 
+        self.EC_POINT_set_affine_coordinates_GF2m = self._lib.EC_POINT_set_affine_coordinates_GF2m
+        self.EC_POINT_set_affine_coordinates_GF2m.restype = ctypes.c_int
+        self.EC_POINT_set_affine_coordinates_GF2m.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+
         self.EC_POINT_new = self._lib.EC_POINT_new
         self.EC_POINT_new.restype = ctypes.c_void_p
         self.EC_POINT_new.argtypes = [ctypes.c_void_p]
@@ -132,6 +159,10 @@ class _OpenSSL:
         self.EC_POINT_mul = self._lib.EC_POINT_mul
         self.EC_POINT_mul.restype = None
         self.EC_POINT_mul.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+
+        self.EC_POINT_add = self._lib.EC_POINT_add
+        self.EC_POINT_add.resType = None
+        self.EC_POINT_add.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 
         self.EC_KEY_set_private_key = self._lib.EC_KEY_set_private_key
         self.EC_KEY_set_private_key.restype = ctypes.c_int
@@ -279,6 +310,10 @@ class _OpenSSL:
         self.i2o_ECPublicKey = self._lib.i2o_ECPublicKey
         self.i2o_ECPublicKey.restype = ctypes.c_void_p
         self.i2o_ECPublicKey.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+
+        self.i2d_ECPKParameters = self._lib.i2d_ECPKParameters
+        self.i2d_ECPKParameters.restype = ctypes.c_void_p
+        self.i2d_ECPKParameters.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 
         self.EVP_sha512 = self._lib.EVP_sha512
         self.EVP_sha512.restype = ctypes.c_void_p
