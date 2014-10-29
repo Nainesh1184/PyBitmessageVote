@@ -377,6 +377,8 @@ class ConsensusProtocol:
         
         data is the binary message, and message_type is the
         type identifier which will be prepended to the data.
+        
+        Returns the hash of the message for identification
         """
         ackdata = OpenSSL.rand(32)
         _, _, _, ripe = decodeAddress( self.chan_address )
@@ -384,7 +386,8 @@ class ConsensusProtocol:
         
         # Append the message type in front of the data
         data = encodeVarint( message_type ) + data
-        log_debug("post_message(type=%d, hash=%s)" % ( message_type, ConsensusProtocol.hash_message( data ).encode('hex' )[:8] ) )
+        message_hash = ConsensusProtocol.hash_message( data )
+        log_debug("post_message(type=%d, hash=%s)" % ( message_type, message_hash.encode('hex' )[:8] ) )
         """
         SQL schema for the sent table:
         msgid blob, toaddress text, toripe blob, fromaddress text, subject text, message text, ackdata blob, lastactiontime integer, status text, pubkeyretrynumber integer, msgretrynumber integer, folder text, encodingtype int
@@ -397,6 +400,8 @@ class ConsensusProtocol:
         sqlExecute( 'INSERT INTO sent VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', *t )
         shared.workerQueue.put(('sendmessage', self.chan_address))
         
+        return message_hash
+        
     def received_message(self, message):
         """
         Called when a new message is received.
@@ -408,7 +413,7 @@ class ConsensusProtocol:
         state = ConsensusProtocol.MESSAGE_STATE_ACCEPTED
         
         if not self.initialized:
-            log_debug("Received message but not yet initialized, saving it for later(type=%d)", ( message_type ) )
+            log_debug("Received message but not yet initialized, saving it for later(type=%d)" % ( message_type ) )
             self.messages_recieved_before_initialization.append( message )
             return
         
@@ -458,7 +463,7 @@ class ConsensusProtocol:
         self.store_message( message_type, data, message_hash, state )
         
         self.refresh_ui()
-        log_debug("received_message(type=%d, state=%d, hash=%s)" % ( message_type, state, message_hash.encode('hex')[:8] ) )
+        log_debug("received_message(type=%d, len=%d, state=%d, hash=%s)" % ( message_type, len( message ), state, message_hash.encode('hex')[:8] ) )
             
     def separate_message_type_and_message(self, data):
         """
@@ -608,10 +613,10 @@ class ConsensusProtocol:
         
     def get_all_messages(self):
         """
-        Returns a list of (time, message) for all ordinary, accepted messages.
+        Returns a list of (time, message, message_hash) for all ordinary, accepted messages.
         """
         ordinary_messages = self.filter_messages( ConsensusProtocol.MESSAGE_MESSAGE, ConsensusProtocol.MESSAGE_STATE_ACCEPTED )
-        return map( lambda m: ( m[0], m[2] ), ordinary_messages  )
+        return map( lambda m: ( m[0], m[2], m[3] ), ordinary_messages  )
     
     def received_metadata_message(self, data):
         if self.get_status() != ConsensusProtocol.STATUS_UNKNOWN:

@@ -3823,30 +3823,43 @@ class MyForm(QtGui.QMainWindow):
             return
         
         answers_dict = election.data.get_answers_dict()
-        for vote in election.data.get_individual_votes():
-            self.ui.tableWidgetVotingVotes.insertRow( 0 )
-            time, tag, answer, votes_with_tag = vote
+        for vote in election.data.get_individual_votes_with_validity():
+            row= self.ui.tableWidgetVotingVotes.rowCount()
+            self.ui.tableWidgetVotingVotes.insertRow( row )
+            time, tag, answer, vote_hash, previous_vote_hash, valid = vote
             
-            color = Qt.black if votes_with_tag == 1 else Qt.gray
+            color = Qt.black if valid else Qt.gray
+            
+            # Time
+            item = QTableWidgetItem( format_time( int( time ) ) )
+            item.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            item.setForeground( color )
+            self.ui.tableWidgetVotingVotes.setItem( row, 0, item )
+            
+            # Vote
+            item = QTableWidgetItem( answers_dict[ answer ] )
+            item.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            item.setForeground( color )
+            self.ui.tableWidgetVotingVotes.setItem( row, 1, item )
             
             # Tag
             item = QTableWidgetItem( str( tag.encode_binary().encode('hex')[:32] ) )
             item.setIcon(avatarize(tag))
             item.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             item.setForeground( color )
-            self.ui.tableWidgetVotingVotes.setItem( 0, 0, item )
+            self.ui.tableWidgetVotingVotes.setItem( row, 2, item )
             
-            # Time
-            item = QTableWidgetItem( format_time( int( time ) ) )
+            # Vote hash
+            item = QTableWidgetItem( str( vote_hash.encode('hex')[:32] ) )
             item.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             item.setForeground( color )
-            self.ui.tableWidgetVotingVotes.setItem( 0, 1, item )
+            self.ui.tableWidgetVotingVotes.setItem( row, 3, item )
             
-            # Vote
-            item = QTableWidgetItem( answers_dict[ answer ] )
+            # Previous vote hash
+            item = QTableWidgetItem( str( previous_vote_hash.encode('hex')[:32] ) if previous_vote_hash is not None else "" )
             item.setFlags( QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             item.setForeground( color )
-            self.ui.tableWidgetVotingVotes.setItem( 0, 2, item )
+            self.ui.tableWidgetVotingVotes.setItem( row, 4, item )
             
             
     def refresh_result_table(self, election):
@@ -3934,6 +3947,7 @@ class MyForm(QtGui.QMainWindow):
             self.ui.widgetVotingActions.hide()
             return
         
+        # self.voting_addresses is a list of ( address, previous_vote_hash ) -tuples
         self.voting_addresses = election.data.get_my_voter_addresses()
         
         # Check if user has any addresses to vote from, and if we are in posting phase
@@ -3943,25 +3957,30 @@ class MyForm(QtGui.QMainWindow):
         
         self.ui.widgetVotingActions.show()
         
-        selected_address = self.current_election_voter_address
+        selected_address, _ = self.current_election_voter_address or ( None, None )
         
         # Single address, just show it on a label
         if len( self.voting_addresses ) == 1:
-            address = self.voting_addresses[0]
+            address, previous_vote_hash = self.voting_addresses[0]
             self.ui.comboBoxVotingMultipleAddresses.hide()
             self.ui.labelVotingVoteSingleAddress.show()
-            self.ui.labelVotingVoteSingleAddress.setText( address )
-            self.current_election_voter_address = address
+            address_text = self.get_address_text(address, previous_vote_hash)
+            self.ui.labelVotingVoteSingleAddress.setText( address_text )
+            self.current_election_voter_address = ( address, previous_vote_hash )
         
         # Multiple addresses, show the choices in a combobox
         else:
             self.ui.labelVotingVoteSingleAddress.hide()
             self.ui.comboBoxVotingMultipleAddresses.show()
             self.ui.comboBoxVotingMultipleAddresses.clear()
-            for address in self.voting_addresses:
-                self.ui.comboBoxVotingMultipleAddresses.addItem( address )
-            if selected_address in self.voting_addresses:
-                self.ui.comboBoxVotingMultipleAddresses.setCurrentIndex( self.voting_addresses.index( selected_address ) )
+            selected_index = i = 0
+            for address, previous_vote_hash in self.voting_addresses:
+                address_text = self.get_address_text(address, previous_vote_hash)
+                self.ui.comboBoxVotingMultipleAddresses.addItem( address_text )
+                if address == selected_address:
+                    selected_index = i 
+                i += 1
+            self.ui.comboBoxVotingMultipleAddresses.setCurrentIndex( selected_index )
                 
                 
         # Show vote possibilities
@@ -3974,8 +3993,17 @@ class MyForm(QtGui.QMainWindow):
         if selected_answer is not None:
             if selected_answer in self.voting_vote_answers:
                 self.ui.comboBoxVotingVote.setCurrentIndex( self.voting_vote_answers.index( selected_answer ) )
+                
+    def get_address_text(self, address, previous_vote_hash):
+        if previous_vote_hash is None:
+            return address
+        elif previous_vote_hash == VotingData.COMPUTING_VOTE:
+            return "%s (casting vote...)" % address
+        else:
+            return "%s (already voted)" % address
         
     def comboBoxVotingMultipleAddressesIndexChanged(self, index):
+        # ( address, previous_vote_hash ) -tuple
         self.current_election_voter_address = self.voting_addresses[index] if index >= 0 else None
         
     def comboBoxVotingVoteIndexChanged(self, index):
@@ -3984,11 +4012,15 @@ class MyForm(QtGui.QMainWindow):
     def pushButtonVotingCastVoteClicked(self):
         if self.current_election_voter_address is None or self.current_election_answer is None:
             return
+        if self.current_election_voter_address[1] == VotingData.COMPUTING_VOTE:
+            QMessageBox.information( self, "Casting vote", "A vote is currently being cast from this address. Please wait..." )
+            return
         
         answer_no = self.current_election_answer[0]
+        vote_address, previous_vote_hash = self.current_election_voter_address
         
         cp = self.current_election
-        cp.data.cast_vote( self.current_election_voter_address, answer_no )
+        cp.data.cast_vote( vote_address, answer_no, previous_vote_hash )
         
         # Casting a vote removes the address from the list of addresses,
         # so we should update the voting actions

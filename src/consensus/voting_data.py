@@ -15,7 +15,6 @@ from consensus_data import ConsensusData
 from ringsignature import RingSignature
 import helper_keys
 from ec import Curve, ECHelper, Point
-from consensus.bitcoin_helper import log_warn
 
 # Set to True to log debug info
 DEBUG = True
@@ -30,6 +29,8 @@ class VotingData(ConsensusData):
     # Set to True to disable checking that the public keys provided
     # actually match the addresses.
     DISABLE_CHECKING_PUBLIC_KEYS_MATCH_ADDRESSES = False
+    
+    COMPUTING_VOTE = "computing"
 
     def __init__(self, blockchain, time_data, question, answers, addresses, public_keys=None, dont_check=False ):
         """
@@ -188,21 +189,21 @@ class VotingData(ConsensusData):
         if not VotingData.DISABLE_CHECKING_PUBLIC_KEYS_MATCH_ADDRESSES:
             self.validate_public_keys_with_addresses()
     
-    def cast_vote(self, fromaddress, answerNo):
+    def cast_vote(self, fromaddress, answerNo, previous_vote_hash):
         """
         Cast a vote asynchronously and mark the fromaddress as having voted.
         """
-        shared.workerQueue.put( ("castVote", ( self.cp.id, fromaddress, answerNo ) ) )    
-        self.settings_add_already_voted_address( fromaddress )
+        shared.workerQueue.put( ("castVote", ( self.cp.id, fromaddress, answerNo, previous_vote_hash ) ) )    
+        self.settings_set_already_voted_address( fromaddress, VotingData.COMPUTING_VOTE )
         
     @staticmethod
-    def compute_and_cast_vote(consensus_id, fromaddress, answerNo):
+    def compute_and_cast_vote(consensus_id, fromaddress, answerNo, previous_vote_hash):
         """
         Generates the answer message with linkable ring signature and posts
         it using ConsensusProtocol.post_message(message).
         
         This method should be invoked by
-        shared.workerQueue.put( ("castVote", ( consensus_id, fromaddress, answerNo ) ) ) 
+        shared.workerQueue.put( ("castVote", ( consensus_id, fromaddress, answerNo, previous_vote_hash ) ) ) 
         """
         log_debug("compute_and_cast_vote(%d, %s, %d)" % ( consensus_id, fromaddress, answerNo ) )
         cp = ConsensusProtocol.read_from_id( consensus_id )
@@ -229,15 +230,17 @@ class VotingData(ConsensusData):
         privSigningKey = arithmetic.decode( privSigningKey, 256 )
         
         signer_index = cp.data.addresses.index( fromaddress )
- 
-        message = str( answerNo )
+        
+        message = VotingData.encode_vote( answerNo, previous_vote_hash )
 
         rs = RingSignature.sign_message(message, cp.data.signing_keys, privSigningKey, signer_index)
         c0, ss, Y_tilde = rs
         
         data = VotingData.encode_ring_signature( message, c0, ss, Y_tilde)
+        message_hash = cp.post_message( data )
         cp.update_status_bar( '' )
-        cp.post_message( data )
+        cp.data.settings_set_already_voted_address( fromaddress, message_hash )
+        cp.refresh_ui()
         
     def message_valid( self, data ):
         """
@@ -248,6 +251,7 @@ class VotingData(ConsensusData):
         """
         log_debug("message_valid()")
         message, c_0, ss, Y_tilde = self.decode_ring_signature( data )
+        VotingData.decode_vote( message )
         if RingSignature.verify_message(message, self.signing_keys, c_0, ss, Y_tilde):
             return True
         else:
@@ -318,10 +322,11 @@ class VotingData(ConsensusData):
         
     def get_my_voter_addresses(self):
         """
-        Returns all controlled addresses which are registered for voting
-        and haven't yet cast a vote.
+        Returns a tuple ( address, previous_vote_hash ) of all controlled addresses
+        which are registered for voting. previous_vote_hash is None if the address
+        hasn't cast a vote previously
         """
-        return [ addr for addr in self.addresses if shared.config.has_section( addr ) and addr not in self.settings_get_already_voted_addresses() ]
+        return [ ( addr, self.settings_get_already_voted_address( addr ) ) for addr in self.addresses if shared.config.has_section( addr ) ]
     
     def get_answers_dict(self):
         """
@@ -334,7 +339,7 @@ class VotingData(ConsensusData):
         Returns a list of ( answer_no, answer, amount_votes=0 ) for each answer_no
         Doesn't count votes from addresses which have sent more than one vote
         """
-        votes = map( lambda v: v[2], self.get_individual_valid_votes( message_tuples ) )
+        votes = map( lambda v: v[2], filter( lambda v: v[5], self.get_individual_votes_with_validity( message_tuples ) ) )
         
         # Prepare a dictionary where the answer numbers are keys and the
         # values are the amount of votes for that answer number
@@ -347,17 +352,103 @@ class VotingData(ConsensusData):
         
         return [( i, self.answers[i], votes_dict[i] if i in votes_dict else 0) for i in range( len( self.answers ) )] 
     
-    def get_individual_valid_votes(self, message_tuples=None):
+    def get_individual_votes_with_validity(self, message_tuples=None):
         """
-        Returns a list of tuples (time, tag, answer, votes_with_tag)
-        just like get_individual_votes(), but only rows with votes_with_tag==1
-        are included
+        Returns a list of tuples (time, tag, answer, hash, previous_vote_hash, valid)
+        The last element 'valid' informs of whether or not this vote could be counted
+        in the final tally
+        
+        We do this by creating a tree of votes for each tag.
+        The root vote for each tag is the "original vote" (the one without a previous hash)
+            (If more than one root vote exists for a tag, discard all votes with that tag)
+        The tree forms a chain where revotes link with the votes they are supposed to overwrite.
+        
+        For each tag, go through the tree from the root vote, and ensure that each vote has at most 1
+        vote below them.
+            If 1 "subvote", proceed to that subvote
+            If 0, current vote is the valid one
         """
-        return filter( lambda v: v[3] == 1, self.get_individual_votes( message_tuples ) )
+        import time
+        start_time = time.time()
+        votes = self.get_individual_votes(message_tuples)
+        
+        valid_votes = {}
+        
+        tags = {}
+        for v in votes:
+            tag = v[1]
+            if tag not in tags:
+                tags[tag] = []
+            tags[tag].append( v )
+            
+        # Now we have a map of all votes by their tag
+        # So we'll go through each tag 
+        for tag, votes_with_tag in tags.iteritems():
 
+            votes_by_hash = dict( ( ( v[3], ( v, [] )  ) for v in votes_with_tag ) )
+                
+            # For this tag, we now have a map of all votes by their hash
+            # We'll now go through all revotes and assign them as children
+            # of the correct original vote
+            for v in filter( lambda v: v[4] is not None, votes_with_tag ):
+                vote_hash, previous_hash = v[3], v[4]
+                if previous_hash not in votes_by_hash:
+                    continue
+                
+                log_debug( "Setting %s as child of %s with tag %s" % ( vote_hash.encode('hex')[:8], previous_hash.encode('hex')[:8], tag.encode_binary().encode('hex')[:8] ) )
+                votes_by_hash[ previous_hash ][1].append( vote_hash )
+                
+            log_debug( "Votes by hash: %s" % votes_by_hash )
+            log_debug( "Votes by hash values:" )
+            for v in votes_by_hash.values():
+                log_debug( "Vote: %d %s" % ( len( v ), v[0], ) )
+                log_debug( "Child hashes: %s" % ( map( lambda h: h.encode('hex')[:8], v[1] ), ) )
+                
+            # Now we go through all original votes and ensure that
+            # their revotes form a single "line" from the original vote
+            # to the revote (If e.g. one vote in the chain has more than
+            # 1 child, we'll discard everything)
+            
+            def _get_end_vote( vote_hash ):
+                if vote_hash not in votes_by_hash:
+                    # Unknown vote
+                    return None
+                vote, child_hashes = votes_by_hash[ vote_hash ]
+                if len( child_hashes ) == 0:
+                    # End of the chain
+                    return vote
+                elif len( child_hashes ) == 1:
+                    return _get_end_vote( child_hashes[0] )
+                else:
+                    # More than one child... discard
+                    return None
+                
+            # v[0][4]: 0 is v in ( v, <list> ), 4 is previous_vote_hash
+            # So this is all original votes (i.e. non-revotes)
+            original_votes = filter( lambda v: v[0][4] is None, votes_by_hash.values() )
+            if len( original_votes ) != 1:
+                # Discard all votes with this tag if it has more
+                # than one original vote
+                continue
+            
+            original_vote = original_votes[0]
+            valid_vote = _get_end_vote( original_vote[0][3] )
+            if valid_vote is not None:
+                vote_hash = valid_vote[3]
+                valid_votes[vote_hash] = valid_vote
+            
+        log_debug( "checking votes with validity took %.3f seconds" % ( time.time()-start_time, ) )
+        for v in valid_votes.values():
+            time, tag, answer, vote_hash, previous_vote_hash = v
+            yield ( time, tag, answer, vote_hash, previous_vote_hash, True )
+        for v in filter( lambda v: v[3] not in valid_votes, votes ):
+            time, tag, answer, vote_hash, previous_vote_hash = v
+            yield ( time, tag, answer, vote_hash, previous_vote_hash, False )
+        
+    
     def get_individual_votes(self, message_tuples=None):
         """
-        Returns a list of tuples (time, tag, answer, votes_with_tag)
+        Returns a list of tuples (time, tag, answer, hash, previous_vote_hash)
         The last element 'votes_with_tag' informs of how many votes has been
         received from this tag,and should thus be 1 for the vote to not
         be discarded
@@ -366,23 +457,17 @@ class VotingData(ConsensusData):
             message_tuples = self.cp.get_all_messages()
             
         times = map( lambda m: m[0], message_tuples )
+        hashes = map( lambda m: m[2], message_tuples )
         # messages_decoded is a list of ( message, c_0, ss, tag )
         # tag is an EC point
         messages_decoded = map( lambda m: self.decode_ring_signature( m[1] ), message_tuples )
         
-        messages = map( lambda m: int( m[0] ), messages_decoded )
+        votes = map( lambda m: VotingData.decode_vote( m[0] ), messages_decoded )
+        answers = map( lambda v: v[0], votes )
+        previous_vote_hashes = map( lambda v: v[1], votes )
         tags = map( lambda m: m[3], messages_decoded )
         
-        # Find amount of votes with tags, start by creating a dict with amount of votes per tag
-        votes_per_tag = {}
-        for tag in tags:
-            if not tag in votes_per_tag:
-                votes_per_tag[tag] = 0
-            votes_per_tag[tag] += 1
-            
-        votes_with_tags = map( lambda t: votes_per_tag[t], tags )
-        
-        return zip( times, tags, messages, votes_with_tags )
+        return zip( times, tags, answers, hashes, previous_vote_hashes )
     
     def get_discarded_vote_count(self):
         """
@@ -390,23 +475,32 @@ class VotingData(ConsensusData):
         cast more than one vote.
         """
         individual_votes = self.get_individual_votes()
-        discarded_votes = filter( lambda v: v[3] != 1, individual_votes )
+        discarded_votes = filter( lambda v: v[4] != 1, individual_votes )
         return len( discarded_votes )
     
     def clear_settings(self):
-        self.settings_set_already_voted_addresses([])
+        self.settings_set_already_voted_addresses({})
         self.settings_clear_pubkey_last_request_times()
         
     def settings_get_already_voted_addresses(self):
-        return self.cp.settings["voted_addresses"] if "voted_addresses" in self.cp.settings else []
+        if not "voted_addresses" in self.cp.settings:
+            return {}
+        hex_encoded = self.cp.settings["voted_addresses"]
+        return dict( ( ( addr, pvh.decode('hex') ) for addr, pvh in hex_encoded.items() ) )
+    def settings_get_already_voted_address(self, address):
+        voted_addresses = self.settings_get_already_voted_addresses()
+        if address in voted_addresses:
+            return voted_addresses[address]
+        else:
+            return None
     def settings_set_already_voted_addresses(self, addresses):
-        self.cp.settings["voted_addresses"] = addresses
+        hex_encoded = dict( ( ( addr, pvh.encode('hex') ) for addr, pvh in addresses.items() ) )
+        self.cp.settings["voted_addresses"] = hex_encoded
         self.cp.store()
-    def settings_add_already_voted_address(self, address):
+    def settings_set_already_voted_address(self, address, vote_hash):
         addresses = self.settings_get_already_voted_addresses()
-        if address not in addresses:
-            addresses.append( address )
-            self.settings_set_already_voted_addresses( addresses )
+        addresses[address] = vote_hash
+        self.settings_set_already_voted_addresses( addresses )
             
     def settings_get_pubkey_last_request_time(self, address):
         if not "pubkeys_last_request_time" in self.cp.settings:
@@ -557,6 +651,47 @@ class VotingData(ConsensusData):
             public_keys.append( pubkey )
             
         return VotingData( blockchain, time_data, question, answers, addresses, public_keys, dont_check )
+    
+    @staticmethod
+    def encode_vote( answer_no, previous_vote_hash ):
+        """
+        Encode a vote.
+        
+        Format:
+        [ answer_no(varInt) ]
+        [ pvh_len(varInt) ][ pvh ]
+        """
+        if previous_vote_hash is None:
+            previous_vote_hash = ""
+        
+        data = encodeVarint( answer_no )
+        
+        data += encodeVarint( len( previous_vote_hash ) )
+        data += previous_vote_hash
+        
+        return data
+        
+    @staticmethod
+    def decode_vote( data ):
+        """
+        Decode a vote,
+        
+        returns ( answer_no, previous_vote_hash )
+        """
+        read_pos = 0
+
+        answer_no, offset = decodeVarint( data[read_pos:read_pos+10] )
+        read_pos += offset
+        previous_vote_hash_len, offset = decodeVarint( data[read_pos:read_pos+10] )
+        read_pos += offset
+        previous_vote_hash = data[read_pos:read_pos+previous_vote_hash_len]
+        read_pos += previous_vote_hash_len
+        
+        if previous_vote_hash == "":
+            previous_vote_hash = None
+        
+        return answer_no, previous_vote_hash
+        
         
     @staticmethod
     def encode_ring_signature( message, c0, ss, Y_tilde ):
@@ -677,4 +812,6 @@ class VotingData(ConsensusData):
 def log_debug(msg):
     if DEBUG:
         logger.debug("VotingData> %s" % msg)
+def log_warn(msg):
+    logger.warn( "VotingData> %s" % ( msg, ) )
         

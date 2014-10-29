@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bitmessageui.ui'
 #
-# Created: Tue Oct 28 20:16:18 2014
+# Created: Wed Oct 29 16:19:36 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -549,7 +549,7 @@ class Ui_MainWindow(object):
         self.tableWidgetVotingVotes.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
         self.tableWidgetVotingVotes.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
         self.tableWidgetVotingVotes.setObjectName(_fromUtf8("tableWidgetVotingVotes"))
-        self.tableWidgetVotingVotes.setColumnCount(3)
+        self.tableWidgetVotingVotes.setColumnCount(5)
         self.tableWidgetVotingVotes.setRowCount(0)
         item = QtGui.QTableWidgetItem()
         self.tableWidgetVotingVotes.setHorizontalHeaderItem(0, item)
@@ -557,6 +557,10 @@ class Ui_MainWindow(object):
         self.tableWidgetVotingVotes.setHorizontalHeaderItem(1, item)
         item = QtGui.QTableWidgetItem()
         self.tableWidgetVotingVotes.setHorizontalHeaderItem(2, item)
+        item = QtGui.QTableWidgetItem()
+        self.tableWidgetVotingVotes.setHorizontalHeaderItem(3, item)
+        item = QtGui.QTableWidgetItem()
+        self.tableWidgetVotingVotes.setHorizontalHeaderItem(4, item)
         self.tableWidgetVotingVotes.horizontalHeader().setDefaultSectionSize(150)
         self.tableWidgetVotingVotes.horizontalHeader().setStretchLastSection(True)
         self.tableWidgetVotingVotes.verticalHeader().setVisible(False)
@@ -756,7 +760,7 @@ class Ui_MainWindow(object):
         self.menubar.addAction(self.menuHelp.menuAction())
 
         self.retranslateUi(MainWindow)
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(8)
         QtCore.QObject.connect(self.radioButtonSpecific, QtCore.SIGNAL(_fromUtf8("toggled(bool)")), self.lineEditTo.setEnabled)
         QtCore.QObject.connect(self.radioButtonSpecific, QtCore.SIGNAL(_fromUtf8("clicked(bool)")), self.labelSendBroadcastWarning.hide)
         QtCore.QObject.connect(self.radioButtonBroadcast, QtCore.SIGNAL(_fromUtf8("clicked()")), self.labelSendBroadcastWarning.show)
@@ -894,11 +898,15 @@ class Ui_MainWindow(object):
         self.pushButtonVotingOptions.setText(_translate("MainWindow", "Options", None))
         self.label_7.setText(_translate("MainWindow", "Individual votes", None))
         item = self.tableWidgetVotingVotes.horizontalHeaderItem(0)
-        item.setText(_translate("MainWindow", "Tag", None))
-        item = self.tableWidgetVotingVotes.horizontalHeaderItem(1)
         item.setText(_translate("MainWindow", "Time", None))
-        item = self.tableWidgetVotingVotes.horizontalHeaderItem(2)
+        item = self.tableWidgetVotingVotes.horizontalHeaderItem(1)
         item.setText(_translate("MainWindow", "Vote", None))
+        item = self.tableWidgetVotingVotes.horizontalHeaderItem(2)
+        item.setText(_translate("MainWindow", "Tag", None))
+        item = self.tableWidgetVotingVotes.horizontalHeaderItem(3)
+        item.setText(_translate("MainWindow", "Hash", None))
+        item = self.tableWidgetVotingVotes.horizontalHeaderItem(4)
+        item.setText(_translate("MainWindow", "PrevHash", None))
         self.label_8.setText(_translate("MainWindow", "Our results", None))
         item = self.tableWidgetVotingResults.horizontalHeaderItem(0)
         item.setText(_translate("MainWindow", "Answer", None))

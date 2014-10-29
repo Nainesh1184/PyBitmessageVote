@@ -22,7 +22,16 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
-    <property name="margin">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
      <number>0</number>
     </property>
     <item row="0" column="0">
@@ -57,7 +66,7 @@
        <enum>QTabWidget::Rounded</enum>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>8</number>
       </property>
       <widget class="QWidget" name="inbox">
        <attribute name="icon">
@@ -1285,17 +1294,27 @@ p, li { white-space: pre-wrap; }
                </attribute>
                <column>
                 <property name="text">
-                 <string>Tag</string>
-                </property>
-               </column>
-               <column>
-                <property name="text">
                  <string>Time</string>
                 </property>
                </column>
                <column>
                 <property name="text">
                  <string>Vote</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>Tag</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>Hash</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>PrevHash</string>
                 </property>
                </column>
               </widget>
