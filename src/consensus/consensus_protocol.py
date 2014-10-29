@@ -57,7 +57,7 @@ class ConsensusProtocol:
     
     # Set to True for testing without committing to and checking commitments on the blockchain
     # Should always be False, unless we're testing
-    DISABLE_COMMITMENTS_ON_BLOCKCHAIN = False
+    DISABLE_COMMITMENTS_ON_BLOCKCHAIN = True
     
     # Set to True to always react to MESSAGE_COMMITMENT_PHASE_* messages
     # regardless of whether it is actually true (disable double-checking with the blockchain)
@@ -813,10 +813,10 @@ class ConsensusProtocol:
                     self.store_message( ConsensusProtocol.MESSAGE_COMMITMENT, data, message_hash, ConsensusProtocol.MESSAGE_STATE_INVALID_COMMITMENT )
                     continue
                
-                """
-                Everthing was validated. Save as not processed
-                """
-                self.store_message( ConsensusProtocol.MESSAGE_COMMITMENT, data, message_hash, ConsensusProtocol.MESSAGE_STATE_NOT_PROCESSED )
+            """
+            Everthing was validated. Save as not processed
+            """
+            self.store_message( ConsensusProtocol.MESSAGE_COMMITMENT, data, message_hash, ConsensusProtocol.MESSAGE_STATE_NOT_PROCESSED )
                     
             
     def process_commitment_messages(self):
