@@ -57,7 +57,7 @@ class ConsensusProtocol:
     
     # Set to True for testing without committing to and checking commitments on the blockchain
     # Should always be False, unless we're testing
-    DISABLE_COMMITMENTS_ON_BLOCKCHAIN = True
+    DISABLE_COMMITMENTS_ON_BLOCKCHAIN = False
     
     # Set to True to always react to MESSAGE_COMMITMENT_PHASE_* messages
     # regardless of whether it is actually true (disable double-checking with the blockchain)
