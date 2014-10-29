@@ -83,6 +83,7 @@ class ConsensusProtocol:
         self.data = data
         self.dont_check = dont_check
         self.initialized = False
+        self.messages_recieved_before_initialization = []
 
         if settings is None:
             settings = {}
@@ -254,6 +255,11 @@ class ConsensusProtocol:
         self.refresh_ui()
         shared.UISignalQueue.put(('election_initialized',(self, )))
         
+        messages = self.messages_recieved_before_initialization
+        self.messages_recieved_before_initialization = []
+        for message in messages:
+            self.received_message( message )
+        
     def __init_data__(self):
         if self.data is not None:
             self.data.cp = self
@@ -400,6 +406,11 @@ class ConsensusProtocol:
         message_type, data = self.separate_message_type_and_message( message )
         message_hash = ConsensusProtocol.hash_message( message )
         state = ConsensusProtocol.MESSAGE_STATE_ACCEPTED
+        
+        if not self.initialized:
+            log_debug("Received message but not yet initialized, saving it for later(type=%d)", ( message_type ) )
+            self.messages_recieved_before_initialization.append( message )
+            return
         
         if self.data is None:
             # If we are waiting for the metadata, only allow the metadata message through
