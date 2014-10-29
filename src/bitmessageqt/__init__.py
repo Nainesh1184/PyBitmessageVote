@@ -4871,6 +4871,9 @@ class NewTimestamperSettingsDialog(QtGui.QDialog):
     def unspent_transactions_received(self, result):
         if result is None:
             return
+        if type( result ) != type( [] ):
+            result = [result]
+        
         for obj in result:
             
             balance_btc = 0.0
