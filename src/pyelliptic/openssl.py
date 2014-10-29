@@ -74,7 +74,7 @@ class _OpenSSL:
                                    ctypes.c_void_p]
 
         self.EC_GROUP_get0_generator = self._lib.EC_GROUP_get0_generator
-        self.EC_GROUP_get0_generator.restype = ctypes.c_int
+        self.EC_GROUP_get0_generator.restype = ctypes.c_void_p
         self.EC_GROUP_get0_generator.argtypes = [ctypes.c_void_p]
 
         self.EC_GROUP_get_order = self._lib.EC_GROUP_get_order
@@ -119,7 +119,7 @@ class _OpenSSL:
         self.EC_KEY_get0_group.argtypes = [ctypes.c_void_p]
 
         self.EC_POINT_get_affine_coordinates_GFp = self._lib.EC_POINT_get_affine_coordinates_GFp
-        self.EC_POINT_get_affine_coordinates_GFp.restype = ctypes.c_int
+        self.EC_POINT_get_affine_coordinates_GFp.restype = ctypes.c_void_p
         self.EC_POINT_get_affine_coordinates_GFp.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 
         self.EC_KEY_set_private_key = self._lib.EC_KEY_set_private_key
