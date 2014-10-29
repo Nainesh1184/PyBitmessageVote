@@ -3488,7 +3488,7 @@ class MyForm(QtGui.QMainWindow):
             self.ui.widgetVotingTimer.hide()
             
             
-            if election is not None:
+            if election is not None and election.data is not None:
                 self.ui.labelVotingQuestion.setText( election.data.question )
                 if not election.initialized:
                     self.ui.labelVotingStatus.setText( "Loading... Please wait" )

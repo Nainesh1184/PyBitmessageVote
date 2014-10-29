@@ -785,8 +785,11 @@ class singleWorker(threading.Thread):
 
                 payload += toRipe  # This hash will be checked by the receiver of the message to verify that toRipe belongs to them. This prevents a Surreptitious Forwarding Attack.
                 payload += encodeVarint( encodingtype )
-                messageToTransmit = 'Subject:' + \
-                    subject + '\n' + 'Body:' + message
+                if encodingtype == ConsensusProtocol.ENCODING_TYPE:
+                    messageToTransmit = message
+                else:
+                    messageToTransmit = 'Subject:' + \
+                        subject + '\n' + 'Body:' + message
                 payload += encodeVarint(len(messageToTransmit))
                 payload += messageToTransmit
                 fullAckPayload = self.generateFullAckMessage(
@@ -851,8 +854,11 @@ class singleWorker(threading.Thread):
 
                 payload += toRipe  # This hash will be checked by the receiver of the message to verify that toRipe belongs to them. This prevents a Surreptitious Forwarding Attack.
                 payload += encodeVarint( encodingtype )
-                messageToTransmit = 'Subject:' + \
-                    subject + '\n' + 'Body:' + message
+                if encodingtype == ConsensusProtocol.ENCODING_TYPE:
+                    messageToTransmit = message
+                else:
+                    messageToTransmit = 'Subject:' + \
+                        subject + '\n' + 'Body:' + message
                 payload += encodeVarint(len(messageToTransmit))
                 payload += messageToTransmit
                 if shared.config.has_section(toaddress):
