@@ -4756,7 +4756,7 @@ class NewTimestamperSettingsDialog(QtGui.QDialog):
         
     def pushButtonImportBitcoinAddressClicked(self):
         text, ok = QtGui.QInputDialog.getText(self, 'Import bitcoin address', 'Enter a private key either hex-encoded (64 chars) or as Wallet Import Format (WIF)')
-        text = text.trimmed()
+        text = str( text.trimmed() )
         if ok and text != "":
             if len( text ) == 64:
                 # Private key in hex-encoding
