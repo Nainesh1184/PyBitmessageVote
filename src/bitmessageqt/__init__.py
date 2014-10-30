@@ -3606,12 +3606,6 @@ class MyForm(QtGui.QMainWindow):
         
         self.voting_debug_menu = QtGui.QMenu(self)
 
-        action = QtGui.QAction( "Broadcast election data", self )
-        action.triggered.connect( self.actionVotingDebugBroadcastElectionData )
-        self.voting_debug_menu.addAction( action )
-        
-        self.voting_debug_menu.addSeparator()
-
         action = QtGui.QAction( "Trigger posting phase", self )
         action.triggered.connect( self.actionVotingDebugTriggerPostingPhase )
         action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_NOT_OPEN_YET )
@@ -3666,11 +3660,6 @@ class MyForm(QtGui.QMainWindow):
         self.voting_debug_menu.addAction( action )
         
         self.voting_debug_menu.exec_( self.ui.pushButtonVotingDebug.mapToGlobal(QPoint(0,self.ui.pushButtonVotingDebug.size().height())));
-        
-    def actionVotingDebugBroadcastElectionData(self):
-        if self.current_election is None:
-            return
-        self.current_election.broadcast_consensus_metadata()
         
     def actionVotingDebugTriggerPostingPhase(self):
         if self.current_election is None:
@@ -3773,6 +3762,11 @@ class MyForm(QtGui.QMainWindow):
         self.ui.pushButtonVotingOptions.clicked.connect( self.pushButtonVotingOptionsClicked )
         self.voting_options_menu = QtGui.QMenu(self)
 
+        action = QtGui.QAction( "Broadcast election data", self )
+        action.triggered.connect( self.actionVotingBroadcastElectionData )
+        self.voting_options_menu.addAction( action )
+        
+        self.voting_options_menu.addSeparator()
         action = QtGui.QAction( "Export election to file", self )
         action.triggered.connect( self.actionVotingExportTriggered )
         self.voting_options_menu.addAction( action )
@@ -3784,6 +3778,16 @@ class MyForm(QtGui.QMainWindow):
         
     def pushButtonVotingOptionsClicked(self):
         self.voting_options_menu.exec_( self.ui.pushButtonVotingOptions.mapToGlobal(QPoint(0,self.ui.pushButtonVotingOptions.size().height())));
+        
+    def actionVotingBroadcastElectionData(self):
+        if self.current_election is None:
+            return
+        if not self.current_election.data.has_all_public_keys():
+            QMessageBox.about(self, _translate("MainWindow", "Not all public keys available"), _translate(
+                        "MainWindow", "We don't have all the public keys for this election. Please wait until they have arrived."))
+            return
+        
+        self.current_election.broadcast_consensus_metadata()
         
     def actionVotingExportTriggered(self):
         if self.current_election is None:
@@ -3871,7 +3875,10 @@ class MyForm(QtGui.QMainWindow):
         if election is None or election.data is None:
             return
         
-        for _, answer, votes in election.data.get_answers_and_votes():
+        answers_and_votes = election.data.get_answers_and_votes()
+        answers_and_votes.sort( key=lambda (a_no, a, votes): votes )
+        
+        for _, answer, votes in answers_and_votes:
             self.ui.tableWidgetVotingResults.insertRow(0)
             
             newItem = QTableWidgetItem( answer )
@@ -3922,6 +3929,8 @@ class MyForm(QtGui.QMainWindow):
 
         import json
         results = json.loads( results_json )
+        
+        results.sort( key=lambda (a_no, a, votes): votes )
         
         self.ui.tableWidgetVotingResultDetails.setRowCount( 0 )
         for _, answer, votes in results:

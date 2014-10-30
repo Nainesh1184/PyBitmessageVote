@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'timestampersettingsdialog.ui'
 #
-# Created: Tue Oct 21 12:09:19 2014
+# Created: Thu Oct 30 15:37:11 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -89,8 +89,8 @@ class Ui_TimestamperSettingsDialog(object):
     def retranslateUi(self, TimestamperSettingsDialog):
         TimestamperSettingsDialog.setWindowTitle(_translate("TimestamperSettingsDialog", "Bitcoin addresses", None))
         self.checkBoxTimestamper.setText(_translate("TimestamperSettingsDialog", "Contribute by acting as a timestamper", None))
-        self.label.setText(_translate("TimestamperSettingsDialog", "By being a timestamper, you contribute to the execution of the election by taking part in the commitment and results phases of the election.<br><br>To be a timestamper, you must agree to possibly spend a very small amount of bitcoin (0.00010001 BTC / 10001 satoshi) during the election. This is used to prove that a commitment was created before the deadline and thus ensure that only votes cast before the deadline can be validated as such.<br><br><b>The election cannot be executed if nobody volunteers as timestamper!</b><br><br>Below you can select bitcoin addresses which correspond to your private Bitmessage identities which have enough bitcoins available to use for our purpose. You can either transfer bitcoins to on of those, or import a bitcoin address from a known private key.", None))
-        self.pushButtonImportBitcoinAddress.setText(_translate("TimestamperSettingsDialog", "Import bitcoin address", None))
+        self.label.setText(_translate("TimestamperSettingsDialog", "By being a timestamper, you contribute to the execution of the election by taking part in the commitment and results phases of the election.<br><br>To be a timestamper, you must agree to possibly spend a very small amount of bitcoin (0.00015430 BTC / 15430 satoshi) during the election. This is used to prove that a commitment was created before the deadline and thus ensure that only votes cast before the deadline can be validated as such.<br><br><b>The election cannot be executed if nobody volunteers as timestamper!</b><br><br>Below you can select bitcoin addresses which correspond to your private Bitmessage identities which have enough bitcoins available to use for our purpose. You can either transfer bitcoins to on of those, or import a bitcoin address from a known private key.", None))
+        self.pushButtonImportBitcoinAddress.setText(_translate("TimestamperSettingsDialog", "Import Bitcoin address", None))
         self.pushButtonRefreshBalances.setText(_translate("TimestamperSettingsDialog", "Refresh balances", None))
         item = self.tableWidgetAddresses.horizontalHeaderItem(0)
         item.setText(_translate("TimestamperSettingsDialog", "Bitmessage address", None))
