@@ -983,7 +983,7 @@ class ConsensusProtocol:
             
             list_hash = self.compute_list_hash( message_hashes )
             
-            message_contents = map( lambda m: ( m[0], m[2] ), accepted_messages )
+            message_contents = map( lambda m: ( m[0], m[2], m[3] ), accepted_messages )
             results = self.data.compute_results( message_contents )
     
             data = ConsensusProtocol.pack_results_message(list_hash, results)
