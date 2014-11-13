@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>462</width>
-    <height>502</height>
+    <height>534</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -204,7 +204,7 @@
    <item row="7" column="0">
     <widget class="QLabel" name="label_16">
      <property name="text">
-      <string>Commitment phase&lt;br&gt;deadline&lt;sup&gt;1&lt;/sup&gt;:</string>
+      <string>Timestamping phase&lt;br&gt;deadline&lt;sup&gt;1&lt;/sup&gt;:</string>
      </property>
     </widget>
    </item>

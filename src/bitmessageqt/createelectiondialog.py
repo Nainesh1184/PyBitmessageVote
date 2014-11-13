@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'createelectiondialog.ui'
 #
-# Created: Tue Oct 21 14:44:41 2014
+# Created: Thu Nov 13 11:01:10 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -131,6 +131,6 @@ class Ui_CreateElectionDialog(object):
         self.comboBoxBlockchain.setItemText(1, _translate("CreateElectionDialog", "Bitcoin TESTNET", None))
         self.label_4.setText(_translate("CreateElectionDialog", "Election Start (UTC) *", None))
         self.label_5.setText(_translate("CreateElectionDialog", "Election deadline (UTC) *", None))
-        self.label_6.setText(_translate("CreateElectionDialog", "Commitment phase deadline (UTC) *", None))
+        self.label_6.setText(_translate("CreateElectionDialog", "Timestamping phase deadline (UTC) *", None))
         self.label_9.setText(_translate("CreateElectionDialog", "* = All timestamps are relative to the adjusted block timestamp on the Bitcoin blockchain.", None))
 
