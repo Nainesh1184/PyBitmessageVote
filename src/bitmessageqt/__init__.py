@@ -3574,7 +3574,7 @@ class MyForm(QtGui.QMainWindow):
         mb.setIcon( QtGui.QMessageBox.Information)
         mb.setWindowTitle( "Do you want to be a timestamper?" )
         mb.setTextFormat( Qt.RichText )
-        mb.setText( """By being a timestamper, you contribute to the execution of the election by taking part in the commitment and results phases of the election.<br><br>
+        mb.setText( """By being a timestamper, you contribute to the execution of the election by taking part in the timestamping and results phases of the election.<br><br>
         To be a timestamper, you must agree to possibly spend a very small amount of bitcoin (%.08f BTC / %d satoshi) during the election. This is used to prove that a commitment was created before the deadline and thus ensure that only votes cast before the deadline can be validated as such.<br><br>
         <b>The election cannot be executed if nobody volunteers as timestamper!</b><br><br>
         <b>Do you want to be a timestamper?</b>""" % ( BitcoinThread.BTC_UNSPENT_MIN_AVAILABLE, BitcoinThread.SATOSHI_UNSPENT_MIN_AVAILABLE ) )
@@ -3622,16 +3622,16 @@ class MyForm(QtGui.QMainWindow):
         
         self.voting_debug_menu.addSeparator()
 
-        action = QtGui.QAction( "Trigger commitment phase", self )
+        action = QtGui.QAction( "Trigger timestamping phase", self )
         action.triggered.connect( self.actionVotingDebugTriggerCommitmentPhase )
         action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_POSTING )
         self.voting_debug_menu.addAction( action )
-        action = QtGui.QAction( "Trigger commitment phase (broadcast)", self )
+        action = QtGui.QAction( "Trigger timestamping phase (broadcast)", self )
         action.triggered.connect( self.actionVotingDebugTriggerCommitmentPhaseBroadcast )
         action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_POSTING )
         self.voting_debug_menu.addAction( action )
         
-        action = QtGui.QAction( "Revoke commitment phase", self )
+        action = QtGui.QAction( "Revoke timestamping phase", self )
         action.triggered.connect( self.actionVotingDebugRevokeCommitmentPhase )
         action.setEnabled( self.current_election.get_status() == ConsensusProtocol.STATUS_COMMITMENT_PHASE )
         self.voting_debug_menu.addAction( action )
@@ -4565,7 +4565,7 @@ class NewCreateElectionDialog(QtGui.QDialog):
                         "MainWindow", "Election deadline must be after election start."))
         elif self.deadline >= self.commitment_phase_deadline:
             QMessageBox.about(self, _translate("MainWindow", "Wrong deadline"), _translate(
-                        "MainWindow", "Commitment phase deadline must be after election deadline."))
+                        "MainWindow", "Timestamping phase deadline must be after election deadline."))
         else:
             # First convert from QStrings to normal Python strings
             question = str( self.question )
@@ -4968,7 +4968,7 @@ def get_election_status_text(election):
     elif status == ConsensusProtocol.STATUS_POSTING:
         return "Election is open"
     elif status == ConsensusProtocol.STATUS_COMMITMENT_PHASE:
-        return "Commitment phase"
+        return "Timestamping phase"
     elif status == ConsensusProtocol.STATUS_RESULTS_PHASE:
         return "Election over"
             

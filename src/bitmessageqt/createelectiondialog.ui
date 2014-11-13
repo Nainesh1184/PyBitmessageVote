@@ -142,7 +142,7 @@
    <item row="10" column="0">
     <widget class="QLabel" name="label_6">
      <property name="text">
-      <string>Commitment phase deadline (UTC) *</string>
+      <string>Timestamping phase deadline (UTC) *</string>
      </property>
     </widget>
    </item>

@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'electiondetailsdialog.ui'
 #
-# Created: Thu Oct 23 19:48:55 2014
+# Created: Thu Nov 13 11:05:19 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,7 +26,7 @@ except AttributeError:
 class Ui_ElectionDetailsDialog(object):
     def setupUi(self, ElectionDetailsDialog):
         ElectionDetailsDialog.setObjectName(_fromUtf8("ElectionDetailsDialog"))
-        ElectionDetailsDialog.resize(462, 502)
+        ElectionDetailsDialog.resize(462, 534)
         self.gridLayout = QtGui.QGridLayout(ElectionDetailsDialog)
         self.gridLayout.setHorizontalSpacing(16)
         self.gridLayout.setObjectName(_fromUtf8("gridLayout"))
@@ -227,7 +227,7 @@ class Ui_ElectionDetailsDialog(object):
         self.labelStartTime.setText(_translate("ElectionDetailsDialog", "N/A", None))
         self.labelQuestion.setText(_translate("ElectionDetailsDialog", "N/A", None))
         self.label_2.setText(_translate("ElectionDetailsDialog", "Registered addresses:", None))
-        self.label_16.setText(_translate("ElectionDetailsDialog", "Commitment phase<br>deadline<sup>1</sup>:", None))
+        self.label_16.setText(_translate("ElectionDetailsDialog", "Timestamping phase<br>deadline<sup>1</sup>:", None))
         self.labelDeadline.setText(_translate("ElectionDetailsDialog", "N/A", None))
         self.labelAmountAddresses.setText(_translate("ElectionDetailsDialog", "N/A", None))
         self.labelCommitmentPhaseDeadline.setText(_translate("ElectionDetailsDialog", "N/A", None))
