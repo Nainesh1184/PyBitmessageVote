@@ -1,3 +1,24 @@
+PyBitmessageVote
+================
+This repository contains the proof-of-concept implementation of the voting
+scheme presented in my Master's thesis in Computer Science at the University
+of Copenhagen.
+
+The implementation is built on the code from the PyBitmessage reference client
+for the Bitmessage network.
+
+
+Thesis abstract
+---------------
+This thesis proposes a protocol to conduct anonymous, trustless, decentralized elections over the internet. Only registered voters can vote, multiple votes from the same voter are easily detected and discard, and it is impossible to determine the identity behind a given vote with a better probability than random guessing.
+
+The voting protocol builds on top of a *decentralized deadline consensus protocol* which can form a consensus about which messages have been sent before a specific deadline. This protocol can also be used to suit other purposes, e.g., contests, auctions and applications. All in a decentralized manner.
+
+The protocols use elliptic curve cryptography, Bitcoin and blockchain-technology, the Bitmessage protocol, Linkable Ring Signatures and Invertible Bloom Lookup Tables.
+
+A proof-of-concept client has been developed and implemented, where one can create and execute elections on simple questions.
+
+
 PyBitmessage
 ============
 
